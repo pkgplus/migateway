@@ -2,6 +2,7 @@ package migateway
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/bingbaba/util/logs"
 	"net"
 	"time"
@@ -12,13 +13,6 @@ const (
 	MULTICAST_PORT = 4321
 	SERVER_PORT    = 9898
 
-	CMD_IAM         = `iam`
-	CMD_DEVLIST_ACK = `get_id_list_ack`
-	CMD_HEARTBEAT   = `heartbeat`
-
-	CMD_READ     = `read`
-	CMD_READ_ACK = `read_ack`
-
 	MSG_WHOIS   = `{"cmd":"whois"}`
 	MSG_DEVLIST = `{"cmd":"get_id_list"}`
 )
@@ -28,8 +22,10 @@ var (
 )
 
 type GateWayManager struct {
-	GateWay          *GateWay
-	Devices          map[string][]*Device
+	*GateWayDevice
+	IP               string
+	Port             string
+	Devices          map[string][]Device
 	DiscoveryTime    int64
 	FreshDevListTime int64
 	SendMsgs         chan string
@@ -46,6 +42,7 @@ func NewGateWayManager() (m *GateWayManager, err error) {
 		SendGWMsgs:    make(chan string),
 	}
 
+	//connection
 	err = initRead(m.RecvMsgs)
 	if err != nil {
 		return
@@ -55,22 +52,33 @@ func NewGateWayManager() (m *GateWayManager, err error) {
 		return
 	}
 
+	//find the gateway
+	m.whois()
+
+	//discovery all device
+	err = m.discovery()
+
+	return
+}
+
+func (m *GateWayManager) whois() {
 	//send whois
 	m.SendMultiMsgs <- MSG_WHOIS
 
-	//read msg
-	iam_data := &GateWayDiscResp{}
-	m.GetResp(CMD_IAM, iam_data)
-
-	//gateway info
-	m.GateWay = &GateWay{
-		Sid:   iam_data.Sid,
-		IP:    iam_data.IP,
-		Model: iam_data.Model,
+	//read msg to gateway
+	iamResp := m.WaitIam()
+	m.GateWayDevice = &GateWayDevice{
+		DeviceBaseInfo: iamResp.DeviceBaseInfo,
 	}
+	m.IP = iamResp.IP
+	m.Port = iamResp.Port
+}
+
+func (m *GateWayManager) discovery() error {
+	LOGGER.Info("start to discover the device...")
 
 	//init write to gateway
-	err = initWriteGateWay(m.GateWay.IP, m.SendGWMsgs)
+	err := initWriteGateWay(m.IP, m.SendGWMsgs)
 	if err != nil {
 		return
 	}
@@ -79,31 +87,73 @@ func NewGateWayManager() (m *GateWayManager, err error) {
 	m.SendGWMsgs <- MSG_DEVLIST
 
 	//get devlist response
-	var sids []string
-	devlist_data := &GateWayDevListResp{}
-	m.GetResp(CMD_DEVLIST_ACK, devlist_data)
+	devListResp := m.WaitDevList()
+	for index, sid := range devListResp.Data {
+		m.SendGWMsgs <- NewReadRequest(sid)
+		dev := m.WaitDevice(nil)
 
-	//get every device status
-	for _, sid := range devlist_data.Data {
-		m.SendGWMsgs <- NewGateWayReadRequest(sid)
-		/////////////////////////m.GetResp(CMD_READ_ACK, resp)
+		devs, found := m.Devices[dev.GetModel()]
+		if !found {
+			devs = make(map[string][]Device, 0)
+		}
+		devs = append(devs, dev)
+		m.Devices[dev.GetModel()] = devs
+		LOGGER.Info("DISCOVERY[%d] found the device %s: %v", index, dev.GetModel(), dev.GetData())
 	}
 
+	m.DiscoveryTime = time.Now().UnixNano()
 	return
 }
 
-func (m *GateWayManager) GetResp(cmd string, resp GateWayResp) {
+func (m *GateWayManager) WaitIam() *IamResp {
+	resp := &IamResp{}
+	waitResp(CMD_IAM, resp)
+	return resp
+}
+
+func (m *GateWayManager) WaitDevList() *DeviceListResp {
+	resp := &DeviceListResp{}
+	waitResp(CMD_DEVLIST_ACK, resp)
+	return resp
+}
+
+func (m *GateWayManager) WaitDevice(model string) Device {
+	//model is empty
+	if model == nil || model == "" {
+		dev := &DeviceBaseInfo{}
+		m.waitResp(dev)
+		LOGGER.Info("get model %s", dev.GetModel())
+		return WaitDevice(dev.GetModel())
+	} else {
+		var dev Device
+		switch model {
+		case DEV_MODEL_GATEWAY:
+			dev = &GateWayDevice{}
+		case MODEL_MOTION:
+			dev = &MotionDevice{}
+		default:
+			LOGGER.Warn("unknown model %s", model)
+			dev = &DeviceBaseInfo{}
+		}
+		m.waitResp(dev)
+		dev.freshHeartTime()
+		return dev
+	}
+}
+
+func (m *GateWayManager) waitResp(cmd string, resp Response) {
+	LOGGER.Info("wait \"%s\" response...", cmd)
 	for {
 		msg := <-m.RecvMsgs
 		err = json.Unmarshal(msg, resp)
 		if err != nil {
-			return
-		}
-
-		if resp.GetCmd() == cmd {
-			return
+			LOGGER.Error("parse %s error: %v", string(msg), err)
+			continue
+		} else if resp.GetCmd() != cmd {
+			LOGGER.Warn("wait %s, ingore the msg: %s", cmd, string(msg))
+			continue
 		} else {
-			LOGGER.Warn("ingore the msg: %s", string(msg))
+			break
 		}
 	}
 }
@@ -131,7 +181,7 @@ func initWriteMulti(msgs chan string) error {
 }
 
 func initWriteGateWay(ip string, msgs chan string) error {
-	UDP_ADDR = &net.UDPAddr{
+	UDP_ADDR := &net.UDPAddr{
 		IP:   net.ParseIP(ip),
 		Port: SERVER_PORT,
 	}

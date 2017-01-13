@@ -5,9 +5,17 @@ const (
 )
 
 //GateWay Status
-type GateWayStatusResp struct {
-	*GateWayBaseResp
+type GateWayDevice struct {
+	*DeviceBaseInfo
 	Data struct {
 		RGB string `json:"rgb"`
 	} `json:"data"`
+}
+
+func (g *GateWayDevice) GetData() interface{} {
+	return g.Data
+}
+
+func (g *GateWayDevice) GetRGB() string {
+	return g.Data.RGB
 }

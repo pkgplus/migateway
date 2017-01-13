@@ -1,33 +1,38 @@
 package migateway
 
-type GateWayResp interface {
-	GetCmd() string
-}
+const (
+	CMD_IAM         = `iam`
+	CMD_DEVLIST_ACK = `get_id_list_ack`
+	CMD_HEARTBEAT   = `heartbeat`
+	CMD_REPORT      = `report`
+	CMD_READ_ACK    = `read_ack`
 
-type CommonResp struct {
-	Cmd string `json:"cmd"`
-	Sid string `json:"sid"`
+	CMD_READ = `read`
+)
+
+type Response interface {
+	GetCmd() string
+	GetModel() string
 }
 
 type DeviceBaseResp struct {
-	*CommonResp
-	Model   string `json:"model"`
-	ShortID string `json:"short_id"`
+	Device
+	Cmd string `json:"cmd"`
 }
 
-//GateWay Discovery
-type GateWayDiscResp struct {
-	*DeviceBaseResp        //cmd = "iam"
-	IP              string `json:"ip"`
-	Port            string `json:"port"`
+func (r *DeviceBaseResp) GetCmd() string {
+	return r.Cmd
+}
+
+//GateWay Discovery: cmd="iam"
+type IamResp struct {
+	*DeviceBaseResp
+	IP   string `json:"ip"`
+	Port string `json:"port"`
 }
 
 //Device List
-type GateWayDevListResp struct {
-	*CommonResp          //get_id_list_ack
-	Data        []string `json:"data"`
-}
-
-func (r *CommonResp) GetCmd() string {
-	return r.Cmd
+type DeviceListResp struct {
+	*DeviceBaseResp          //get_id_list_ack
+	Data            []string `json:"data"`
 }
