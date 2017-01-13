@@ -4,17 +4,18 @@ const (
 	MODEL_MOTION = "motion"
 )
 
-type MotionDevice struct {
-	*DeviceBaseInfo
-	Data struct {
-		Status string `json:"status"`
-	} `json:"data"`
+type Motion struct {
+	*Device
+	Status string `json:"status"`
 }
 
-func (m *MotionDevice) GetData() interface{} {
+func (m *Motion) GetData() interface{} {
 	return m.Data
 }
 
-func (m *MotionDevice) GetStatus() string {
-	return m.Data.Status
+func NewMotion(dev *Device) *Motion {
+	return &Motion{
+		Device: dev,
+		Status: dev.GetDataValue("status"),
+	}
 }

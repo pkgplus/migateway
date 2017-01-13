@@ -6,17 +6,14 @@ const (
 	CMD_HEARTBEAT   = `heartbeat`
 	CMD_REPORT      = `report`
 	CMD_READ_ACK    = `read_ack`
-
-	CMD_READ = `read`
 )
 
 type Response interface {
 	GetCmd() string
-	GetModel() string
 }
 
 type DeviceBaseResp struct {
-	Device
+	*Device
 	Cmd string `json:"cmd"`
 }
 
@@ -33,6 +30,13 @@ type IamResp struct {
 
 //Device List
 type DeviceListResp struct {
-	*DeviceBaseResp          //get_id_list_ack
-	Data            []string `json:"data"`
+	*DeviceBaseResp //get_id_list_ack
+	sidArray        []string
+}
+
+func (d *DeviceListResp) getSidArray() []string {
+	if d.sidArray == nil {
+		d.sidArray = d.GetDataArray()
+	}
+	return d.sidArray
 }

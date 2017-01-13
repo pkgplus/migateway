@@ -6,16 +6,10 @@ const (
 
 //GateWay Status
 type GateWayDevice struct {
-	*DeviceBaseInfo
-	Data struct {
-		RGB string `json:"rgb"`
-	} `json:"data"`
-}
-
-func (g *GateWayDevice) GetData() interface{} {
-	return g.Data
+	*Device
+	RGB string `json:"rgb"`
 }
 
 func (g *GateWayDevice) GetRGB() string {
-	return g.Data.RGB
+	return g.RGB
 }

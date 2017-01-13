@@ -4,6 +4,10 @@ import (
 	"encoding/json"
 )
 
+const (
+	CMD_READ = `read`
+)
+
 type GwRequest struct {
 	Cmd string `json:"cmd"`
 	Sid string `json:"sid"`
