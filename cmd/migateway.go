@@ -5,7 +5,7 @@ import (
 )
 
 func main() {
-	_, err := migateway.NewGateWayManager()
+	_, err := migateway.NewGateWayManager(nil)
 	if err != nil {
 		panic(err)
 	}

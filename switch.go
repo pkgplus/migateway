@@ -1,9 +1,5 @@
 package migateway
 
-import (
-	"strconv"
-)
-
 const (
 	MODEL_SWITCH = "switch"
 
@@ -15,16 +11,33 @@ const (
 type Switch struct {
 	*Device
 	Battery int
-	Status  string
 }
 
 func NewSwitch(dev *Device) *Switch {
-	bstr := dev.GetDataValue("battery")
-	bint, _ := strconv.Atoi(bstr)
-
 	return &Switch{
 		Device:  dev,
-		Battery: bint,
-		Status:  dev.GetDataValue("status"),
+		Battery: dev.GetDataAsInt(FIELD_BATTERY),
+	}
+}
+
+func (s *Switch) Set(dev *Device) {
+	if s.hasFiled(FIELD_BATTERY) {
+		s.Battery = s.GetDataAsInt(FIELD_BATTERY)
+	}
+}
+
+func (s *Switch) isClick(dev *Device) bool {
+	if dev.GetData(FIELD_STATUS) == SWITCH_STATUS_CLICK {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (s *Switch) isDoubleClick(dev *Device) bool {
+	if dev.GetData(FIELD_STATUS) == SWITCH_STATUS_DOUBLECLICK {
+		return true
+	} else {
+		return false
 	}
 }

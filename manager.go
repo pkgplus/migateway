@@ -2,6 +2,7 @@ package migateway
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/bingbaba/util/logs"
 	"net"
 	"time"
@@ -11,44 +12,72 @@ const (
 	MULTICAST_ADDR = "224.0.0.50"
 	MULTICAST_PORT = 4321
 	SERVER_PORT    = 9898
-
-	MSG_WHOIS   = `{"cmd":"whois"}`
-	MSG_DEVLIST = `{"cmd":"get_id_list"}`
 )
 
 var (
 	LOGGER      = logs.GetBlogger()
 	EOF    byte = 0
+
+	DefaultConf = &Configure{
+		WhoisTimeOut:   3,
+		WhoisRetry:     5,
+		DevListTimeOut: 3,
+		DevListRetry:   5,
+		ReadTimeout:    3,
+		ReadRetry:      1,
+	}
 )
 
 type GateWayManager struct {
 	*GateWayDevice
+	IP   string
+	Port string
 
-	IP        string
-	Port      string
 	Motions   map[string]*Motion
 	Switchs   map[string]*Switch
 	SensorHTs map[string]*SensorHT
+	Magnets   map[string]*Magnet
+	Plugs     map[string]*Plug
 
 	DiscoveryTime    int64
 	FreshDevListTime int64
 
-	SendMsgs   chan string
+	SendMsgs   chan []byte
 	RecvMsgs   chan []byte
-	SendGWMsgs chan string
+	SendGWMsgs chan []byte
 	RecvGWMsgs chan []byte
+
+	conf *Configure
 }
 
-func NewGateWayManager() (m *GateWayManager, err error) {
+type Configure struct {
+	WhoisTimeOut int
+	WhoisRetry   int
+
+	DevListTimeOut int
+	DevListRetry   int
+
+	ReadTimeout int
+	ReadRetry   int
+}
+
+func NewGateWayManager(c *Configure) (m *GateWayManager, err error) {
+	if c == nil {
+		c = DefaultConf
+	}
+
 	m = &GateWayManager{
 		Motions:       make(map[string]*Motion),
 		Switchs:       make(map[string]*Switch),
 		SensorHTs:     make(map[string]*SensorHT),
+		Magnets:       make(map[string]*Magnet),
+		Plugs:         make(map[string]*Plug),
 		DiscoveryTime: time.Now().Unix(),
-		SendMsgs:      make(chan string),
+		SendMsgs:      make(chan []byte),
 		RecvMsgs:      make(chan []byte, 100),
-		SendGWMsgs:    make(chan string),
+		SendGWMsgs:    make(chan []byte),
 		RecvGWMsgs:    make(chan []byte, 100),
+		conf:          c,
 	}
 
 	//connection
@@ -70,52 +99,46 @@ func NewGateWayManager() (m *GateWayManager, err error) {
 	return
 }
 
-func (m *GateWayManager) whois() {
-	//send whois
-	m.SendMsgs <- MSG_WHOIS
+func (m *GateWayManager) putDevice(dev *Device) (added bool) {
+	LOGGER.Info("DEVICESYNC:: %s(%s): %s", dev.Model, dev.Sid, dev.Data)
 
-	//read msg to gateway
-	iamResp := m.waitIam()
-	m.GateWayDevice = &GateWayDevice{
-		Device: iamResp.Device,
-	}
-	m.IP = iamResp.IP
-	m.Port = iamResp.Port
-}
-
-func (m *GateWayManager) discovery() (err error) {
-	LOGGER.Info("start to discover the device...")
-
-	//send devlist request
-	m.SendGWMsgs <- MSG_DEVLIST
-
-	//get devlist response
-	devListResp := m.waitDevList()
-	for index, sid := range devListResp.getSidArray() {
-		m.SendGWMsgs <- NewReadRequest(sid)
-
-		dev := m.WaitDevice(sid)
-		if m.addDevice(dev) {
-			LOGGER.Warn("DISCOVERY[%d]: found the device %s: %v", index, dev.Model, dev.Data)
-		} else {
-			LOGGER.Warn("DISCOVERY[%d]: unknown model %s device: %v", index, dev.Model, dev)
-		}
-	}
-	m.DiscoveryTime = time.Now().UnixNano()
-
-	return
-}
-
-func (m *GateWayManager) addDevice(dev *Device) (added bool) {
 	added = true
-
 	switch dev.Model {
 	case MODEL_MOTION:
-		m.Motions[dev.Sid] = NewMotion(dev)
+		d, found := m.Motions[dev.Sid]
+		if found {
+			d.Set(dev)
+		} else {
+			m.Motions[dev.Sid] = NewMotion(dev)
+		}
 	case MODEL_SWITCH:
-		m.Switchs[dev.Sid] = NewSwitch(dev)
+		d, found := m.Switchs[dev.Sid]
+		if found {
+			d.Set(dev)
+		} else {
+			m.Switchs[dev.Sid] = NewSwitch(dev)
+		}
 	case MODEL_SENSORHT:
-		m.SensorHTs[dev.Sid] = NewSensorHt(dev)
+		d, found := m.SensorHTs[dev.Sid]
+		if found {
+			d.Set(dev)
+		} else {
+			m.SensorHTs[dev.Sid] = NewSensorHt(dev)
+		}
+	case MODEL_MAGNET:
+		d, found := m.Magnets[dev.Sid]
+		if found {
+			d.Set(dev)
+		} else {
+			m.Magnets[dev.Sid] = NewMagnet(dev)
+		}
+	case MODEL_PLUG:
+		d, found := m.Plugs[dev.Sid]
+		if found {
+			d.Set(dev)
+		} else {
+			m.Plugs[dev.Sid] = NewPlug(dev)
+		}
 	default:
 		added = false
 	}
@@ -123,59 +146,133 @@ func (m *GateWayManager) addDevice(dev *Device) (added bool) {
 	return
 }
 
-func (m *GateWayManager) waitIam() *IamResp {
-	resp := &IamResp{}
-	m.waitResp(CMD_IAM, resp)
-	return resp
+func (m *GateWayManager) whois() {
+	//read msg
+	iamResp := &IamResp{}
+	m.communicate(NewWhoisRequest(), iamResp)
+
+	//gateway infomation
+	m.GateWayDevice = NewGateWayDevice(iamResp.Device)
+	m.IP = iamResp.IP
+	m.Port = iamResp.Port
 }
 
-func (m *GateWayManager) waitDevList() *DeviceListResp {
-	resp := &DeviceListResp{}
-	m.waitResp(CMD_DEVLIST_ACK, resp)
-	return resp
+func (m *GateWayManager) discovery() (err error) {
+	//get devlist response
+	LOGGER.Info("start to discover the device...")
+	devListResp := &DeviceListResp{}
+	if !m.communicate(NewDevListRequest(), devListResp) {
+		return errors.New("show device list error")
+	}
+
+	//every device
+	for index, sid := range devListResp.getSidArray() {
+		dev := m.waitDevice(sid)
+		if m.putDevice(dev) {
+			LOGGER.Warn("DISCOVERY[%d]: found the device %s(%s): %v", index, dev.Model, dev.Data)
+		} else {
+			LOGGER.Warn("DISCOVERY[%d]: unknown model %s device: %v", index, dev.Model, dev)
+		}
+	}
+	m.DiscoveryTime = time.Now().Unix()
+
+	return
 }
 
-func (m *GateWayManager) WaitDevice(sid string) *Device {
+func (m *GateWayManager) waitDevice(sid string) *Device {
+	req := NewReadRequest(sid)
 	resp := &DeviceBaseResp{}
 	for {
-		m.waitResp(CMD_READ_ACK, resp)
-		if resp.Sid == sid {
-			break
-		} else {
-			LOGGER.Info("get a unknown device %s, model = %s, sid = %s", CMD_READ_ACK, resp.Model, resp.Sid)
+		if m.communicate(req, resp) {
+			if resp.Sid == sid {
+				break
+			} else {
+				LOGGER.Info("get a unknown device %s, model = %s, sid = %s", CMD_READ_ACK, resp.Model, resp.Sid)
+			}
 		}
 	}
 	return resp.Device
 }
 
-func (m *GateWayManager) waitResp(cmd string, resp Response) {
-	LOGGER.Info("wait \"%s\" response...", cmd)
-
-	var chanName string
-	var msgChan chan []byte
-	if cmd != CMD_IAM && cmd != CMD_REPORT {
-		msgChan = m.RecvGWMsgs
-		chanName = "GATEWAY"
+func (m *GateWayManager) send(req *Request) bool {
+	if req == nil {
+		return false
 	} else {
-		msgChan = m.RecvMsgs
-		chanName = "MULTICAST"
-	}
-
-	for {
-		msg := <-msgChan
-		err := json.Unmarshal(msg, resp)
-		if err != nil {
-			LOGGER.Error("%s:: parse %s error: %v", chanName, string(msg), err)
-			continue
-		} else if resp.GetCmd() != cmd {
-			LOGGER.Warn("%s:: wait %s, ingore the msg: %s", chanName, cmd, string(msg))
-			continue
+		if req.Cmd == CMD_WHOIS {
+			m.multicast(req)
 		} else {
-			LOGGER.Info("%s:: recv msg: %s", chanName, string(msg))
-			break
+			m.sendGW(req)
+		}
+		return true
+	}
+}
+
+func (m *GateWayManager) getRetryAndTimeout(req *Request) (int, time.Duration) {
+	if req.Cmd == CMD_WHOIS {
+		return m.conf.WhoisRetry, time.Duration(m.conf.WhoisTimeOut) * time.Second
+	} else if req.Cmd == CMD_DEVLIST {
+		return m.conf.DevListRetry, time.Duration(m.conf.DevListTimeOut) * time.Second
+	} else {
+		return m.conf.ReadRetry, time.Duration(m.conf.ReadTimeout) * time.Second
+	}
+}
+
+func (m *GateWayManager) getChan(cmd string) chan []byte {
+	if cmd == CMD_WHOIS {
+		return m.RecvMsgs
+	} else {
+		return m.RecvGWMsgs
+	}
+}
+
+func (m *GateWayManager) multicast(req *Request) {
+	m.SendMsgs <- toBytes(req)
+}
+
+func (m *GateWayManager) sendGW(req *Request) {
+	m.SendGWMsgs <- toBytes(req)
+}
+
+func (m *GateWayManager) communicate(req *Request, resp Response) bool {
+	expectCmd := req.expectCmd()
+	if expectCmd == "" {
+		LOGGER.Warn("unknown request: %s", string(toBytes(req)))
+		return false
+	}
+	//send message
+	m.send(req)
+
+	retry := 0
+	maxRetry, timeout := m.getRetryAndTimeout(req)
+	chanName := req.getChanName()
+
+	LOGGER.Info("%s:: wait \"%s\" response...", chanName, expectCmd)
+	for {
+		select {
+		case msg := <-m.getChan(req.Cmd):
+			err := json.Unmarshal(msg, resp)
+			if err != nil {
+				LOGGER.Error("%s:: parse %s error: %v", chanName, string(msg), err)
+				continue
+			} else if resp.GetCmd() != expectCmd {
+				LOGGER.Warn("%s:: wait %s, ingore the msg: %s", chanName, expectCmd, string(msg))
+				continue
+			} else {
+				LOGGER.Info("%s:: recv msg: %s", chanName, string(msg))
+				return true
+			}
+		case <-time.After(time.Second * timeout):
+			retry++
+			if retry > maxRetry {
+				LOGGER.Error("%S:: recv msg TIMEOUT", chanName)
+				return false
+			} else {
+				LOGGER.Error("%S:: send msg retry %d ...", chanName, retry)
+				m.send(req)
+			}
 		}
 	}
-	return
+	return false
 }
 
 func (g *GateWayManager) initGateWayConn() error {
@@ -236,7 +333,17 @@ func (g *GateWayManager) initMultiCastConn() error {
 				panic(err2)
 			} else if size > 0 {
 				LOGGER.Debug("MULTICAST:: recv msg: %s", string(buf[0:size]))
-				g.RecvMsgs <- buf[0:size]
+
+				resp := &DeviceBaseResp{}
+				errTmp := json.Unmarshal(buf[0:size], resp)
+				if errTmp != nil {
+					LOGGER.Warn("MULTICAST:: parse invalid msg: %s", buf[0:size])
+				} else if resp.Cmd == CMD_REPORT {
+					g.putDevice(resp.Device)
+				} else {
+					g.RecvMsgs <- buf[0:size]
+				}
+
 			}
 		}
 	}()
@@ -249,7 +356,7 @@ func (g *GateWayManager) initMultiCastConn() error {
 	go func() {
 		for {
 			msg := <-g.SendMsgs
-			wsize, err3 := con.WriteToUDP([]byte(MSG_WHOIS), MULTI_UDP_ADDR)
+			wsize, err3 := con.WriteToUDP(msg, MULTI_UDP_ADDR)
 			if err3 != nil {
 				panic(err3)
 			}

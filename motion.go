@@ -1,12 +1,18 @@
 package migateway
 
+import (
+	"time"
+)
+
 const (
 	MODEL_MOTION = "motion"
 )
 
 type Motion struct {
 	*Device
-	Status string `json:"status"`
+	IsMotorial     bool
+	lastMotionTime int64
+	changeTime     int64
 }
 
 func (m *Motion) GetData() interface{} {
@@ -14,8 +20,23 @@ func (m *Motion) GetData() interface{} {
 }
 
 func NewMotion(dev *Device) *Motion {
-	return &Motion{
-		Device: dev,
-		Status: dev.GetDataValue("status"),
+	m := &Motion{Device: dev}
+	m.Set(dev)
+	return m
+}
+
+func (m *Motion) Set(dev *Device) {
+	if dev.hasFiled(FIELD_STATUS) {
+		last := m.IsMotorial
+		ct := time.Now().Unix()
+		m.IsMotorial = dev.GetDataAsBool(FIELD_STATUS)
+
+		if m.IsMotorial {
+			m.lastMotionTime = ct
+		}
+
+		if last != m.IsMotorial {
+			m.changeTime = ct
+		}
 	}
 }

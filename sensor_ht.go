@@ -1,11 +1,10 @@
 package migateway
 
-import (
-	"strconv"
-)
-
 const (
-	MODEL_SENSORHT = "sensor_hb"
+	MODEL_SENSORHT = "sensor_ht"
+
+	FIELD_SENSORHT_TEMPERATURE = "temperature"
+	FIELD_SENSORHT_HUMIDITY    = "humidity"
 )
 
 type SensorHT struct {
@@ -15,14 +14,19 @@ type SensorHT struct {
 }
 
 func NewSensorHt(dev *Device) *SensorHT {
-	tStr := dev.GetDataValue("temperature")
-	t, _ := strconv.ParseFloat(tStr, 64)
-	hStr := dev.GetDataValue("humidity")
-	h, _ := strconv.ParseFloat(hStr, 64)
-
 	return &SensorHT{
 		Device:      dev,
-		Temperature: t / 100,
-		Humidity:    h / 100,
+		Temperature: dev.GetDataAsFloat64(FIELD_SENSORHT_TEMPERATURE) / 100,
+		Humidity:    dev.GetDataAsFloat64(FIELD_SENSORHT_HUMIDITY) / 100,
+	}
+}
+
+func (s *SensorHT) Set(dev *Device) {
+	if dev.hasFiled(FIELD_SENSORHT_TEMPERATURE) {
+		s.Temperature = dev.GetDataAsFloat64(FIELD_SENSORHT_TEMPERATURE) / 100
+	}
+
+	if dev.hasFiled(FIELD_SENSORHT_HUMIDITY) {
+		s.Humidity = dev.GetDataAsFloat64(FIELD_SENSORHT_HUMIDITY) / 100
 	}
 }
