@@ -24,6 +24,9 @@ func (s *Switch) Set(dev *Device) {
 	if s.hasFiled(FIELD_BATTERY) {
 		s.Battery = s.GetDataAsInt(FIELD_BATTERY)
 	}
+	if dev.Token != "" {
+		s.Token = dev.Token
+	}
 }
 
 func (s *Switch) isClick(dev *Device) bool {

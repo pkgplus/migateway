@@ -7,7 +7,7 @@ const (
 type Magnet struct {
 	*Device
 	Opened  bool
-	Battery uint64
+	Battery uint32
 }
 
 func NewMagnet(dev *Device) *Magnet {
@@ -23,6 +23,10 @@ func (m *Magnet) Set(dev *Device) {
 	}
 
 	if dev.hasFiled(FIELD_BATTERY) {
-		m.Battery = dev.GetDataAsUint64(FIELD_BATTERY)
+		m.Battery = dev.GetDataAsUint32(FIELD_BATTERY)
+	}
+
+	if dev.Token != "" {
+		m.Token = dev.Token
 	}
 }

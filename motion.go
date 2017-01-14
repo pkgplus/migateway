@@ -39,4 +39,8 @@ func (m *Motion) Set(dev *Device) {
 			m.changeTime = ct
 		}
 	}
+
+	if dev.Token != "" {
+		m.Token = dev.Token
+	}
 }

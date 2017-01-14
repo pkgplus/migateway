@@ -29,4 +29,7 @@ func (s *SensorHT) Set(dev *Device) {
 	if dev.hasFiled(FIELD_SENSORHT_HUMIDITY) {
 		s.Humidity = dev.GetDataAsFloat64(FIELD_SENSORHT_HUMIDITY) / 100
 	}
+	if dev.Token != "" {
+		s.Token = dev.Token
+	}
 }

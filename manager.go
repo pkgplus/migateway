@@ -25,12 +25,13 @@ var (
 		DevListRetry:   5,
 		ReadTimeout:    3,
 		ReadRetry:      1,
+		AESKey:         "pk7clc5c1318qldn",
 	}
 )
 
 type GateWayManager struct {
 	*GateWayDevice
-	IP   string
+	//IP   string
 	Port string
 
 	Motions   map[string]*Motion
@@ -47,7 +48,7 @@ type GateWayManager struct {
 	SendGWMsgs chan []byte
 	RecvGWMsgs chan []byte
 
-	conf *Configure
+	Conf *Configure
 }
 
 type Configure struct {
@@ -59,6 +60,8 @@ type Configure struct {
 
 	ReadTimeout int
 	ReadRetry   int
+
+	AESKey string
 }
 
 func NewGateWayManager(c *Configure) (m *GateWayManager, err error) {
@@ -77,7 +80,7 @@ func NewGateWayManager(c *Configure) (m *GateWayManager, err error) {
 		RecvMsgs:      make(chan []byte, 100),
 		SendGWMsgs:    make(chan []byte),
 		RecvGWMsgs:    make(chan []byte, 100),
-		conf:          c,
+		Conf:          c,
 	}
 
 	//connection
@@ -99,11 +102,26 @@ func NewGateWayManager(c *Configure) (m *GateWayManager, err error) {
 	return
 }
 
+func (m *GateWayManager) Control(dev *Device, data map[string]interface{}) error {
+	req, err := NewWriteRequest(dev, m.Conf.AESKey, data)
+	if err != nil {
+		return err
+	}
+	m.Send(req)
+	return nil
+}
+
+func (m *GateWayManager) SetAESKey(key string) {
+	m.Conf.AESKey = key
+}
+
 func (m *GateWayManager) putDevice(dev *Device) (added bool) {
 	LOGGER.Info("DEVICESYNC:: %s(%s): %s", dev.Model, dev.Sid, dev.Data)
 
 	added = true
 	switch dev.Model {
+	case MODEL_GATEWAY:
+		m.GateWayDevice.Set(dev)
 	case MODEL_MOTION:
 		d, found := m.Motions[dev.Sid]
 		if found {
@@ -169,7 +187,7 @@ func (m *GateWayManager) discovery() (err error) {
 	for index, sid := range devListResp.getSidArray() {
 		dev := m.waitDevice(sid)
 		if m.putDevice(dev) {
-			LOGGER.Warn("DISCOVERY[%d]: found the device %s(%s): %v", index, dev.Model, dev.Data)
+			LOGGER.Warn("DISCOVERY[%d]: found the device %s(%s): %v", index, dev.Model, dev.Sid, dev.Data)
 		} else {
 			LOGGER.Warn("DISCOVERY[%d]: unknown model %s device: %v", index, dev.Model, dev)
 		}
@@ -194,7 +212,7 @@ func (m *GateWayManager) waitDevice(sid string) *Device {
 	return resp.Device
 }
 
-func (m *GateWayManager) send(req *Request) bool {
+func (m *GateWayManager) Send(req *Request) bool {
 	if req == nil {
 		return false
 	} else {
@@ -209,11 +227,11 @@ func (m *GateWayManager) send(req *Request) bool {
 
 func (m *GateWayManager) getRetryAndTimeout(req *Request) (int, time.Duration) {
 	if req.Cmd == CMD_WHOIS {
-		return m.conf.WhoisRetry, time.Duration(m.conf.WhoisTimeOut) * time.Second
+		return m.Conf.WhoisRetry, time.Duration(m.Conf.WhoisTimeOut) * time.Second
 	} else if req.Cmd == CMD_DEVLIST {
-		return m.conf.DevListRetry, time.Duration(m.conf.DevListTimeOut) * time.Second
+		return m.Conf.DevListRetry, time.Duration(m.Conf.DevListTimeOut) * time.Second
 	} else {
-		return m.conf.ReadRetry, time.Duration(m.conf.ReadTimeout) * time.Second
+		return m.Conf.ReadRetry, time.Duration(m.Conf.ReadTimeout) * time.Second
 	}
 }
 
@@ -240,7 +258,7 @@ func (m *GateWayManager) communicate(req *Request, resp Response) bool {
 		return false
 	}
 	//send message
-	m.send(req)
+	m.Send(req)
 
 	retry := 0
 	maxRetry, timeout := m.getRetryAndTimeout(req)
@@ -268,7 +286,7 @@ func (m *GateWayManager) communicate(req *Request, resp Response) bool {
 				return false
 			} else {
 				LOGGER.Error("%S:: send msg retry %d ...", chanName, retry)
-				m.send(req)
+				m.Send(req)
 			}
 		}
 	}
@@ -335,10 +353,11 @@ func (g *GateWayManager) initMultiCastConn() error {
 				LOGGER.Debug("MULTICAST:: recv msg: %s", string(buf[0:size]))
 
 				resp := &DeviceBaseResp{}
-				errTmp := json.Unmarshal(buf[0:size], resp)
-				if errTmp != nil {
-					LOGGER.Warn("MULTICAST:: parse invalid msg: %s", buf[0:size])
-				} else if resp.Cmd == CMD_REPORT {
+				json.Unmarshal(buf[0:size], resp)
+				// if errTmp != nil {
+				// 	LOGGER.Warn("MULTICAST:: parse invalid msg: %s, error:%v", buf[0:size], errTmp)
+				// }
+				if resp.Cmd == CMD_REPORT || resp.Cmd == CMD_HEARTBEAT {
 					g.putDevice(resp.Device)
 				} else {
 					g.RecvMsgs <- buf[0:size]

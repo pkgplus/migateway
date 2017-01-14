@@ -11,9 +11,9 @@ type Plug struct {
 	*Device
 	InUse         bool
 	IsOn          bool
-	LoadVoltage   uint64
-	LoadPower     uint64
-	PowerConsumed uint64
+	LoadVoltage   uint32
+	LoadPower     uint32
+	PowerConsumed uint32
 }
 
 func NewPlug(dev *Device) *Plug {
@@ -30,12 +30,15 @@ func (p *Plug) Set(dev *Device) {
 		p.IsOn = dev.GetDataAsBool(FIELD_STATUS)
 	}
 	if dev.hasFiled(FIELD_PLUG_LOADVOLTAGE) {
-		p.LoadVoltage = dev.GetDataAsUint64(FIELD_PLUG_LOADVOLTAGE)
+		p.LoadVoltage = dev.GetDataAsUint32(FIELD_PLUG_LOADVOLTAGE)
 	}
 	if dev.hasFiled(FIELD_PLUG_LOADPOWER) {
-		p.LoadPower = dev.GetDataAsUint64(FIELD_PLUG_LOADPOWER)
+		p.LoadPower = dev.GetDataAsUint32(FIELD_PLUG_LOADPOWER)
 	}
 	if dev.hasFiled(FIELD_PLUG_POWERCONSUMED) {
-		p.PowerConsumed = dev.GetDataAsUint64(FIELD_PLUG_POWERCONSUMED)
+		p.PowerConsumed = dev.GetDataAsUint32(FIELD_PLUG_POWERCONSUMED)
+	}
+	if dev.Token != "" {
+		p.Token = dev.Token
 	}
 }

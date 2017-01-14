@@ -6,6 +6,7 @@ const (
 	CMD_HEARTBEAT   = `heartbeat`
 	CMD_REPORT      = `report`
 	CMD_READ_ACK    = `read_ack`
+	CMD_WRITE_ACK   = `write_ack`
 )
 
 type Response interface {
