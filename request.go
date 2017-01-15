@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -61,14 +62,16 @@ var (
 	iv = []byte{0x17, 0x99, 0x6d, 0x09, 0x3d, 0x28, 0xdd, 0xb3, 0xba, 0x69, 0x5a, 0x2e, 0x6f, 0x58, 0x56, 0x2e}
 )
 
-func NewWriteRequest(dev *Device, aesKey string, data map[string]interface{}) (*Request, error) {
+func newWriteRequest(dev *Device, aesKey string, data map[string]interface{}) (*Request, error) {
+	if dev.Token == "" {
+		return nil, errors.New(fmt.Sprintf("the %s(%s) device's token is null!", dev.Model, dev.Sid))
+	}
+
 	key_bytes := []byte(aesKey)
 	block, err := aes.NewCipher(key_bytes)
 	if err != nil {
 		return nil, err
 	}
-	LOGGER.Error("TOKEN = %s", dev.Token)
-
 	mode := cipher.NewCBCEncrypter(block, iv)
 	ciphertext := make([]byte, 16)
 	mode.CryptBlocks(ciphertext, []byte(dev.Token))

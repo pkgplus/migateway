@@ -19,17 +19,23 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	gwm.SetAESKey("aamfgyc8mbra3jhq")
 
-	time.Sleep(time.Second * 10)
+	conn := gwm.GateWayConn
+	conn.SetAESKey("t7ew6r4y612eml0f")
 
-	LOGGER.Info("write...")
-	gwd := gwm.GateWayDevice.Device
+	for _, color := range migateway.COLOR_ALL {
+		err = gwm.ChangeColor(conn, color)
+		if err != nil {
+			panic(err)
+		}
+		time.Sleep(time.Second)
+	}
 
-	err = gwm.Control(gwd, map[string]interface{}{"rgb": 922794751})
+	err = gwm.Flashing(conn, migateway.COLOR_RED)
 	if err != nil {
 		panic(err)
 	}
 
-	<-make(chan bool)
+	//do something...
+	time.Sleep(10 * time.Second)
 }

@@ -34,7 +34,31 @@ func (d *Device) freshHeartTime() {
 	d.heartBeatTime = time.Now().Unix()
 }
 
+func (d *Device) setToken(t string) {
+	d.Token = t
+}
+
+func (d *Device) waitToken() bool {
+	begin := time.Now().Unix()
+	for {
+		ct := time.Now().Unix()
+		if d.Token != "" &&
+			d.heartBeatTime-ct <= 7200 {
+			return true
+		} else if ct-begin >= 30 {
+			return false
+		}
+		time.Sleep(time.Second)
+	}
+
+	return false
+}
+
 func (d *Device) hasFiled(field string) (found bool) {
+	if d.Data == "" {
+		return false
+	}
+
 	if d.dataMap == nil {
 		d.dataMap = make(map[string]interface{})
 		err := json.Unmarshal([]byte(d.Data), &d.dataMap)
@@ -43,7 +67,6 @@ func (d *Device) hasFiled(field string) (found bool) {
 			return false
 		}
 	}
-
 	_, found = d.dataMap[field]
 	return
 }
@@ -58,7 +81,7 @@ func (d *Device) GetData(field string) string {
 			case reflect.Int:
 				return fmt.Sprintf("%d", v.(int))
 			case reflect.Float64:
-				return fmt.Sprintf("%f", v.(float64))
+				return fmt.Sprintf("%0.f", v.(float64))
 			case reflect.String:
 				return v.(string)
 			default:

@@ -26,24 +26,29 @@ import (
 )
 
 func main() {
-    //init
     gwm, err := migateway.NewGateWayManager(nil)
     if err != nil {
         panic(err)
     }
 
-    //set the gate aes key
-    gwm.SetAESKey("aamfgyc8mbra3jhq")
+    conn := gwm.GateWayConn
+    conn.SetAESKey("t7ew6r4y612eml0f")
 
-    //wait 10 secondes
-    time.Sleep(time.Second * 10)
-    gwd := gwm.GateWayDevice.Device
-    err = gwm.Control(gwd, map[string]interface{}{"rgb": 922794751})
+    for _, color := range migateway.COLOR_ALL {
+        err = gwm.ChangeColor(conn, color)
+        if err != nil {
+            panic(err)
+        }
+        time.Sleep(time.Second)
+    }
+
+    err = gwm.Flashing(conn, migateway.COLOR_RED)
     if err != nil {
         panic(err)
     }
 
     //do something...
+    time.Sleep(10 * time.Second)
 }
 
 ```
