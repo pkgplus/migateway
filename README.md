@@ -1,14 +1,16 @@
 # migateway
 ## API DOC
 小米网关协议文档参考
+
 [原版](https://github.com/louisZL/lumi-gateway-local-api) 
+
 [修正格式版](https://github.com/xuebing1110/lumi-gateway-local-api)
 
 ## FEATURES
-* 支持网关自动发现
-* 支持设备自动发现
-* 支持设备状态自动更新
-* 支持网关彩灯控制，并支持颜色、闪烁等控制
+* 支持网关自动发现(whois)
+* 支持设备自动发现(get_id_list,read)
+* 支持设备状态自动更新(report/heartbeat)
+* 支持网关彩灯控制，并支持颜色、闪烁等控制(write)
 
 ## TODO LIST
 * 支持智能插座的控制
