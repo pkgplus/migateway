@@ -14,7 +14,7 @@
 * 代码优化，调用更简洁
 * 增加网关彩灯常用RGB颜色的调用
 * 支持场景自动化的配置
-* 服务运行树莓派3上
+* 服务运行树莓派3上[树莓派安装文档](http://blog.bingbaba.com/post/diy/raspberrypi/)
 
 ## EXAMPLE
 ```golang
