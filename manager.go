@@ -55,16 +55,6 @@ func NewAqaraManager(c *Configure) (m *AqaraManager, err error) {
 		return
 	}
 
-	//find gateway
-	m.whois(conn)
-
-	//show device list
-	gw_ip := m.GateWay.IP
-	err = conn.initGateWay(gw_ip)
-	if err != nil {
-		return
-	}
-
 	//AqaraManager
 	m = &AqaraManager{
 		reportChan:    reportChan,
@@ -75,6 +65,17 @@ func NewAqaraManager(c *Configure) (m *AqaraManager, err error) {
 		Plugs:         make(map[string]*Plug),
 		DiscoveryTime: time.Now().Unix(),
 	}
+
+	//find gateway
+	m.whois(conn)
+
+	//show device list
+	gw_ip := m.GateWay.IP
+	err = conn.initGateWay(gw_ip)
+	if err != nil {
+		return
+	}
+
 	err = m.discovery()
 
 	//report or heartbeat message
