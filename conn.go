@@ -64,7 +64,7 @@ func (gwc *GateWayConn) waitDevice(sid string) *Device {
 	return resp.Device
 }
 
-func (gwc *GateWayConn) initMultiCastConn(dev_chan chan *Device) error {
+func (gwc *GateWayConn) initMultiCast(dev_chan chan *Device) error {
 	//listen
 	udp_l := &net.UDPAddr{IP: net.ParseIP(MULTICAST_ADDR), Port: SERVER_PORT}
 	con, err := net.ListenMulticastUDP("udp4", nil, udp_l)
@@ -87,6 +87,7 @@ func (gwc *GateWayConn) initMultiCastConn(dev_chan chan *Device) error {
 
 				resp := &DeviceBaseResp{}
 				json.Unmarshal(buf[0:size], resp)
+
 				// if errTmp != nil {
 				//  LOGGER.Warn("MULTICAST:: parse invalid msg: %s, error:%v", buf[0:size], errTmp)
 				// }
@@ -172,7 +173,7 @@ func (gwc *GateWayConn) communicate(req *Request, resp Response) bool {
 	return false
 }
 
-func (gwc *GateWayConn) initGateWayConn(ip string) error {
+func (gwc *GateWayConn) initGateWay(ip string) error {
 	UDP_ADDR := &net.UDPAddr{
 		IP:   net.ParseIP(ip),
 		Port: SERVER_PORT,

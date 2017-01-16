@@ -16,6 +16,7 @@ const (
 )
 
 type Device struct {
+	conn    *GateWayConn
 	Sid     string `json:"sid,omitempty"`
 	Model   string `json:"model,omitempty"`
 	ShortID int    `json:"short_id,omitempty"`

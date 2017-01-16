@@ -16,20 +16,20 @@ const (
 )
 
 //GateWay Status
-type GateWayDevice struct {
+type GateWay struct {
 	*Device
 	IP   string
 	Port string
 	RGB  uint32
 }
 
-func NewGateWayDevice(dev *Device) *GateWayDevice {
-	g := &GateWayDevice{Device: dev}
+func NewGateWay(dev *Device) *GateWay {
+	g := &GateWay{Device: dev}
 	g.Set(dev)
 	return g
 }
 
-func (g *GateWayDevice) Set(dev *Device) {
+func (g *GateWay) Set(dev *Device) {
 	if dev.hasFiled(FIELD_IP) {
 		g.IP = dev.GetData(FIELD_IP)
 	}
@@ -44,37 +44,37 @@ func (g *GateWayDevice) Set(dev *Device) {
 	}
 }
 
-func (gwd *GateWayDevice) ChangeColor(conn *GateWayConn, c color.Color) error {
+func (gwd *GateWay) ChangeColor(c color.Color) error {
 	data := map[string]interface{}{FIELD_GATEWAY_RGB: RGBNumber(c)}
-	return conn.Control(gwd.Device, data)
+	return gwd.conn.Control(gwd.Device, data)
 }
 
-func (gwd *GateWayDevice) Flashing(conn *GateWayConn, c color.Color) error {
+func (gwd *GateWay) Flashing(c color.Color) error {
 	interval := 500 * time.Millisecond
-	err := gwd.flashingOnce(conn, c, interval)
+	err := gwd.flashingOnce(c, interval)
 	if err != nil {
 		return err
 	}
 	go func() {
 		for {
 			time.Sleep(interval)
-			gwd.flashingOnce(conn, c, interval)
+			gwd.flashingOnce(c, interval)
 		}
 	}()
 	return nil
 }
 
-func (gwd *GateWayDevice) flashingOnce(conn *GateWayConn, c color.Color, interval time.Duration) error {
+func (gwd *GateWay) flashingOnce(c color.Color, interval time.Duration) error {
 	updata := map[string]interface{}{FIELD_GATEWAY_RGB: RGBNumber(c)}
 	downdata := map[string]interface{}{FIELD_GATEWAY_RGB: RGBNumber(COLOR_BLACK)}
 
-	err := conn.Control(gwd.Device, updata)
+	err := gwd.conn.Control(gwd.Device, updata)
 	if err != nil {
 		return err
 	}
 
 	time.Sleep(interval)
-	err = conn.Control(gwd.Device, downdata)
+	err = gwd.conn.Control(gwd.Device, downdata)
 	if err != nil {
 		return err
 	}
