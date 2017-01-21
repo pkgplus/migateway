@@ -9,16 +9,6 @@ import (
 var (
 	LOGGER      = logs.GetBlogger()
 	EOF    byte = 0
-
-	DefaultConf = &Configure{
-		WhoisTimeOut:   3,
-		WhoisRetry:     5,
-		DevListTimeOut: 3,
-		DevListRetry:   5,
-		ReadTimeout:    3,
-		ReadRetry:      1,
-		AESKey:         "pk7clc5c1318qldn",
-	}
 )
 
 type AqaraManager struct {
@@ -39,25 +29,16 @@ func NewAqaraManager(c *Configure) (m *AqaraManager, err error) {
 	if c == nil {
 		c = DefaultConf
 	}
-
-	conn := &GateWayConn{
-		SendMsgs:   make(chan []byte),
-		RecvMsgs:   make(chan []byte, 100),
-		SendGWMsgs: make(chan []byte),
-		RecvGWMsgs: make(chan []byte, 100),
-		Configure:  c,
-	}
+	conn := NewConn(c)
 
 	//connection
-	reportChan := make(chan *Device, 100)
-	err = conn.initMultiCast(reportChan)
+	err = conn.initMultiCast()
 	if err != nil {
 		return
 	}
 
 	//AqaraManager
 	m = &AqaraManager{
-		reportChan:    reportChan,
 		Motions:       make(map[string]*Motion),
 		Switchs:       make(map[string]*Switch),
 		SensorHTs:     make(map[string]*SensorHT),
@@ -81,8 +62,7 @@ func NewAqaraManager(c *Configure) (m *AqaraManager, err error) {
 	//report or heartbeat message
 	go func() {
 		for {
-			dev := <-m.reportChan
-			m.putDevice(dev)
+			m.putDevice(<-conn.devMsgs)
 		}
 	}()
 

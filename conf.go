@@ -4,17 +4,31 @@ import (
 	"time"
 )
 
+var (
+	DefaultConf = &Configure{
+		WhoisTimeOut:         3,
+		WhoisRetry:           5,
+		DevListTimeOut:       3,
+		DevListRetry:         5,
+		ReadTimeout:          3,
+		ReadRetry:            1,
+		ReportForwardTimeout: 1,
+		ReportListen:         false,
+		AESKey:               "pk7clc5c1318qldn",
+	}
+)
+
 type Configure struct {
-	WhoisTimeOut int
-	WhoisRetry   int
+	WhoisTimeOut         int
+	WhoisRetry           int
+	DevListTimeOut       int
+	DevListRetry         int
+	ReadTimeout          int
+	ReadRetry            int
+	ReportForwardTimeout int
 
-	DevListTimeOut int
-	DevListRetry   int
-
-	ReadTimeout int
-	ReadRetry   int
-
-	AESKey string
+	AESKey       string
+	ReportListen bool
 }
 
 func (c *Configure) getRetryAndTimeout(req *Request) (int, time.Duration) {
@@ -29,4 +43,8 @@ func (c *Configure) getRetryAndTimeout(req *Request) (int, time.Duration) {
 
 func (c *Configure) SetAESKey(key string) {
 	c.AESKey = key
+}
+
+func (c *Configure) SetReportListen(bool b) {
+	c.ReportListen = b
 }

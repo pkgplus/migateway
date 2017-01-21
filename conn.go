@@ -18,8 +18,22 @@ type GateWayConn struct {
 	RecvMsgs   chan []byte
 	SendGWMsgs chan []byte
 	RecvGWMsgs chan []byte
+	ReportMsgs chan *Device
+	devMsgs    chan *Device
 
 	*Configure
+}
+
+func NewConn(c *Configure) *GateWayConn {
+	return &GateWayConn{
+		SendMsgs:   make(chan []byte),
+		RecvMsgs:   make(chan []byte, 100),
+		SendGWMsgs: make(chan []byte),
+		RecvGWMsgs: make(chan []byte, 100),
+		ReportMsgs: make(chan *Device, 100),
+		devMsgs:    make(chan *Device, 100),
+		Configure:  c,
+	}
 }
 
 func (gwc *GateWayConn) Control(dev *Device, data map[string]interface{}) error {
@@ -64,7 +78,7 @@ func (gwc *GateWayConn) waitDevice(sid string) *Device {
 	return resp.Device
 }
 
-func (gwc *GateWayConn) initMultiCast(dev_chan chan *Device) error {
+func (gwc *GateWayConn) initMultiCast() error {
 	//listen
 	udp_l := &net.UDPAddr{IP: net.ParseIP(MULTICAST_ADDR), Port: SERVER_PORT}
 	con, err := net.ListenMulticastUDP("udp4", nil, udp_l)
@@ -92,10 +106,13 @@ func (gwc *GateWayConn) initMultiCast(dev_chan chan *Device) error {
 				//  LOGGER.Warn("MULTICAST:: parse invalid msg: %s, error:%v", buf[0:size], errTmp)
 				// }
 				if resp.Cmd == CMD_REPORT {
-					dev_chan <- resp.Device
+					gwc.devMsgs <- resp.Device
+					if gwc.ReportListen {
+
+					}
 				} else if resp.Cmd == CMD_HEARTBEAT {
 					resp.freshHeartTime()
-					dev_chan <- resp.Device
+					gwc.devMsgs <- resp.Device
 				} else {
 					gwc.RecvMsgs <- buf[0:size]
 				}
@@ -121,6 +138,17 @@ func (gwc *GateWayConn) initMultiCast(dev_chan chan *Device) error {
 	}()
 
 	return nil
+}
+
+func (gwc *GateWayConn) forwardReport(dev *Device) bool {
+	var forwarded bool
+	select {
+	case gwc.ReportMsgs <- dev:
+		forwarded = true
+	case <-time.After(time.Duration(gwc.ReportForwardTimeout) * time.Second):
+		LOGGER.Error("forward report message timeout:: %s", string(toBytes(dev)))
+	}
+	return forwarded
 }
 
 func (gwc *GateWayConn) multicast(req *Request) {
