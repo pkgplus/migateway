@@ -45,6 +45,6 @@ func (c *Configure) SetAESKey(key string) {
 	c.AESKey = key
 }
 
-func (c *Configure) SetReportListen(bool b) {
+func (c *Configure) SetReportListen(b bool) {
 	c.ReportListen = b
 }
