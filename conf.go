@@ -14,7 +14,7 @@ var (
 		ReadRetry:            1,
 		ReportForwardTimeout: 1,
 		ReportListen:         false,
-		AESKey:               "pk7clc5c1318qldn",
+		AESKey:               "",
 	}
 )
 
@@ -29,6 +29,20 @@ type Configure struct {
 
 	AESKey       string
 	ReportListen bool
+}
+
+func NewConfig() *Configure {
+	return &Configure{
+		WhoisTimeOut:         3,
+		WhoisRetry:           5,
+		DevListTimeOut:       3,
+		DevListRetry:         5,
+		ReadTimeout:          3,
+		ReadRetry:            1,
+		ReportForwardTimeout: 1,
+		ReportListen:         false,
+		AESKey:               "",
+	}
 }
 
 func (c *Configure) getRetryAndTimeout(req *Request) (int, time.Duration) {

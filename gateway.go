@@ -1,6 +1,7 @@
 package migateway
 
 import (
+	"errors"
 	"image/color"
 	"time"
 )
@@ -18,9 +19,11 @@ const (
 //GateWay Status
 type GateWay struct {
 	*Device
-	IP   string
-	Port string
-	RGB  uint32
+	IP       string
+	Port     string
+	lastRGB  uint32
+	RGB      uint32
+	callBack func(gw *GateWay) error
 }
 
 func NewGateWay(dev *Device) *GateWay {
@@ -34,6 +37,10 @@ func (g *GateWay) Set(dev *Device) {
 		g.IP = dev.GetData(FIELD_IP)
 	}
 	if dev.hasFiled(FIELD_GATEWAY_RGB) {
+		if g.RGB != RGBNumber(COLOR_BLACK) && g.RGB != 0 {
+			LOGGER.Info("Save Last RGB:%d", g.RGB)
+			g.lastRGB = g.RGB
+		}
 		g.RGB = dev.GetDataAsUint32(FIELD_GATEWAY_RGB)
 	}
 	if dev.Token != "" {
@@ -42,11 +49,53 @@ func (g *GateWay) Set(dev *Device) {
 	if dev.ShortID > 0 {
 		g.ShortID = dev.ShortID
 	}
+	if g.callBack != nil {
+		err := g.callBack(g)
+		if err != nil {
+			LOGGER.Error("exec callback error:%v", err)
+		}
+	}
+}
+
+func (gwd *GateWay) RegisterCb(cb func(gw *GateWay) error) {
+	gwd.callBack = cb
 }
 
 func (gwd *GateWay) ChangeColor(c color.Color) error {
 	data := map[string]interface{}{FIELD_GATEWAY_RGB: RGBNumber(c)}
 	return gwd.conn.Control(gwd.Device, data)
+}
+
+func (gwd *GateWay) ChangeBrightness(b int) error {
+	if b < 0 || b > 100 {
+		return errors.New("Brightness should be 0~100")
+	}
+
+	if b == 0 {
+		return gwd.TurnOff()
+	} else {
+		rgb := NewRGB(gwd.RGB)
+		rgb.Brightness(float64(b) / 100)
+		return gwd.ChangeColor(rgb)
+	}
+}
+
+func (gwd *GateWay) TurnOff() error {
+	return gwd.ChangeColor(COLOR_BLACK)
+}
+
+func (gwd *GateWay) TurnOn() error {
+	if gwd.RGB > 0 {
+		return nil
+	}
+
+	if gwd.lastRGB == 0 {
+		gwd.lastRGB = RGBNumber(COLOR_WHITE)
+		LOGGER.Warn("Use Default RGB:%d", gwd.lastRGB)
+	}
+	rgb := NewRGB(gwd.lastRGB)
+	LOGGER.Warn("Change Color %d,%d,%d", rgb.r, rgb.g, rgb.b)
+	return gwd.ChangeColor(rgb)
 }
 
 func (gwd *GateWay) Flashing(c color.Color) error {

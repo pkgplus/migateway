@@ -35,6 +35,10 @@ func (d *Device) freshHeartTime() {
 	d.heartBeatTime = time.Now().Unix()
 }
 
+func (d *Device) GetHeartTime() int64 {
+	return d.heartBeatTime
+}
+
 func (d *Device) setToken(t string) {
 	d.Token = t
 }
