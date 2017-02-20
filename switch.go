@@ -14,6 +14,7 @@ type Switch struct {
 }
 
 func NewSwitch(dev *Device) *Switch {
+	dev.ReportChan = make(chan bool, 1)
 	return &Switch{
 		Device:  dev,
 		Battery: dev.GetDataAsInt(FIELD_BATTERY),

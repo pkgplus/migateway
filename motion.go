@@ -20,6 +20,7 @@ func (m *Motion) GetData() interface{} {
 }
 
 func NewMotion(dev *Device) *Motion {
+	dev.ReportChan = make(chan bool, 1)
 	m := &Motion{Device: dev}
 	m.Set(dev)
 	return m

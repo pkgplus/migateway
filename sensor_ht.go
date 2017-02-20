@@ -14,6 +14,7 @@ type SensorHT struct {
 }
 
 func NewSensorHt(dev *Device) *SensorHT {
+	dev.ReportChan = make(chan bool, 1)
 	return &SensorHT{
 		Device:      dev,
 		Temperature: dev.GetDataAsFloat64(FIELD_SENSORHT_TEMPERATURE) / 100,

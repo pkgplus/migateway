@@ -27,6 +27,7 @@ type GateWay struct {
 }
 
 func NewGateWay(dev *Device) *GateWay {
+	dev.ReportChan = make(chan bool, 1)
 	g := &GateWay{Device: dev}
 	g.Set(dev)
 	return g
@@ -86,13 +87,12 @@ func (gwd *GateWay) TurnOff() error {
 
 func (gwd *GateWay) TurnOn() error {
 	if gwd.RGB > 0 {
-		return nil
-	}
-
-	if gwd.lastRGB == 0 {
+		gwd.lastRGB = gwd.RGB
+	} else if gwd.lastRGB == 0 {
 		gwd.lastRGB = RGBNumber(COLOR_WHITE)
 		LOGGER.Warn("Use Default RGB:%d", gwd.lastRGB)
 	}
+
 	rgb := NewRGB(gwd.lastRGB)
 	LOGGER.Warn("Change Color %d,%d,%d", rgb.r, rgb.g, rgb.b)
 	return gwd.ChangeColor(rgb)

@@ -23,6 +23,7 @@ type Device struct {
 	Data    string `json:"data,omitempty"`
 	Token   string `json:"token,omitempty"`
 
+	ReportChan    chan bool `json:"-"`
 	heartBeatTime int64
 	dataMap       map[string]interface{}
 }

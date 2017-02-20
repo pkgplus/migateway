@@ -18,9 +18,7 @@ type GateWayConn struct {
 	RecvMsgs   chan []byte
 	SendGWMsgs chan []byte
 	RecvGWMsgs chan []byte
-	ReportMsgs chan *Device
 	devMsgs    chan *Device
-
 	*Configure
 }
 
@@ -30,7 +28,6 @@ func NewConn(c *Configure) *GateWayConn {
 		RecvMsgs:   make(chan []byte, 100),
 		SendGWMsgs: make(chan []byte),
 		RecvGWMsgs: make(chan []byte, 100),
-		ReportMsgs: make(chan *Device, 100),
 		devMsgs:    make(chan *Device, 100),
 		Configure:  c,
 	}
@@ -107,9 +104,6 @@ func (gwc *GateWayConn) initMultiCast() error {
 				// }
 				if resp.Cmd == CMD_REPORT {
 					gwc.devMsgs <- resp.Device
-					if gwc.ReportListen {
-
-					}
 				} else if resp.Cmd == CMD_HEARTBEAT {
 					resp.freshHeartTime()
 					gwc.devMsgs <- resp.Device
@@ -140,7 +134,7 @@ func (gwc *GateWayConn) initMultiCast() error {
 	return nil
 }
 
-func (gwc *GateWayConn) forwardReport(dev *Device) bool {
+/*func (gwc *GateWayConn) forwardReport(dev *Device) bool {
 	var forwarded bool
 	select {
 	case gwc.ReportMsgs <- dev:
@@ -150,6 +144,7 @@ func (gwc *GateWayConn) forwardReport(dev *Device) bool {
 	}
 	return forwarded
 }
+*/
 
 func (gwc *GateWayConn) multicast(req *Request) {
 	gwc.SendMsgs <- toBytes(req)

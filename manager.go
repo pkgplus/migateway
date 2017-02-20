@@ -73,10 +73,12 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 	LOGGER.Info("DEVICESYNC:: %s(%s): %s", dev.Model, dev.Sid, dev.Data)
 	gateway := m.GateWay
 
+	var saveDev *Device
 	added = true
 	switch dev.Model {
 	case MODEL_GATEWAY:
 		gateway.Set(dev)
+		saveDev = gateway.Device
 	case MODEL_MOTION:
 		d, found := m.Motions[dev.Sid]
 		if found {
@@ -85,6 +87,7 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 			dev.conn = gateway.conn
 			m.Motions[dev.Sid] = NewMotion(dev)
 		}
+		saveDev = m.Motions[dev.Sid].Device
 	case MODEL_SWITCH:
 		d, found := m.Switchs[dev.Sid]
 		if found {
@@ -93,6 +96,7 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 			dev.conn = gateway.conn
 			m.Switchs[dev.Sid] = NewSwitch(dev)
 		}
+		saveDev = m.Switchs[dev.Sid].Device
 	case MODEL_SENSORHT:
 		d, found := m.SensorHTs[dev.Sid]
 		if found {
@@ -101,6 +105,7 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 			dev.conn = gateway.conn
 			m.SensorHTs[dev.Sid] = NewSensorHt(dev)
 		}
+		saveDev = m.SensorHTs[dev.Sid].Device
 	case MODEL_MAGNET:
 		d, found := m.Magnets[dev.Sid]
 		if found {
@@ -109,6 +114,7 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 			dev.conn = gateway.conn
 			m.Magnets[dev.Sid] = NewMagnet(dev)
 		}
+		saveDev = m.Magnets[dev.Sid].Device
 	case MODEL_PLUG:
 		d, found := m.Plugs[dev.Sid]
 		if found {
@@ -117,9 +123,17 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 			dev.conn = gateway.conn
 			m.Plugs[dev.Sid] = NewPlug(dev)
 		}
+		saveDev = m.Plugs[dev.Sid].Device
 	default:
 		added = false
 		LOGGER.Warn("DEVICESYNC:: unknown model is %s", dev.Model)
+	}
+
+	if saveDev != nil {
+		select {
+		case saveDev.ReportChan <- true:
+		default:
+		}
 	}
 
 	return

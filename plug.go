@@ -17,6 +17,7 @@ type Plug struct {
 }
 
 func NewPlug(dev *Device) *Plug {
+	dev.ReportChan = make(chan bool, 1)
 	p := &Plug{Device: dev}
 	p.Set(dev)
 	return p

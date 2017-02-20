@@ -11,6 +11,7 @@ type Magnet struct {
 }
 
 func NewMagnet(dev *Device) *Magnet {
+	dev.ReportChan = make(chan bool, 1)
 	return &Magnet{
 		Device: dev,
 		Opened: dev.GetDataAsBool(FIELD_STATUS),
