@@ -39,8 +39,8 @@ func (g *GateWay) Set(dev *Device) {
 		g.IP = dev.GetData(FIELD_IP)
 	}
 	if dev.hasFiled(FIELD_GATEWAY_RGB) {
-		if g.RGB != RGBNumber(mcolor.COLOR_BLACK) && g.RGB != 0 {
-			LOGGER.Info("Save Last RGB:%d", g.RGB)
+		if g.RGB != 0 {
+			LOGGER.Warn("Save Last RGB:%d", g.RGB)
 			g.lastRGB = g.RGB
 		}
 		g.RGB = dev.GetDataAsUint32(FIELD_GATEWAY_RGB)
@@ -64,20 +64,29 @@ func (gwd *GateWay) RegisterCb(cb func(gw *GateWay) error) {
 }
 
 func (gwd *GateWay) ChangeColor(c color.Color) error {
+	r, g, b, a := c.RGBA()
+	LOGGER.Info("r:%d,g:%d,b:%d,a:%d", r<<24>>24, g<<24>>24, b<<24>>24, a<<24>>24)
+
 	data := map[string]interface{}{FIELD_GATEWAY_RGB: RGBNumber(c)}
 	return gwd.conn.Control(gwd.Device, data)
 }
 
 func (gwd *GateWay) ChangeBrightness(b int) error {
 	if b < 0 || b > 100 {
-		return errors.New("Brightness should be 0~100")
+		return errors.New("Brightness should be 0~100 !!!")
 	}
 
 	if b == 0 {
 		return gwd.TurnOff()
 	} else {
-		rgb := NewRGB(gwd.RGB)
-		rgb.Brightness(uint8(b))
+		var rgbNum uint32
+		if gwd.RGB<<24>>24 == 0 {
+			rgbNum = gwd.lastRGB
+		} else {
+			rgbNum = gwd.RGB
+		}
+		rgb := NewRGB(rgbNum)
+		rgb.A = uint8(100 - b)
 		return gwd.ChangeColor(rgb)
 	}
 }

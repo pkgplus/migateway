@@ -129,12 +129,14 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 		LOGGER.Warn("DEVICESYNC:: unknown model is %s", dev.Model)
 	}
 
+	LOGGER.Debug("save to report chan...")
 	if saveDev != nil {
 		select {
 		case saveDev.ReportChan <- true:
 		default:
 		}
 	}
+	LOGGER.Debug("save to report chan over!")
 
 	return
 }
