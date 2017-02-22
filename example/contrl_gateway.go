@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/bingbaba/tool/color"
 	"github.com/bingbaba/util/logs"
 	"github.com/xuebing1110/migateway"
 	"time"
@@ -22,7 +23,7 @@ func main() {
 	manager.SetAESKey("t7ew6r4y612eml0f")
 
 	gateway := manager.GateWay
-	for _, color := range migateway.COLOR_ALL {
+	for _, color := range color.COLOR_ALL {
 		err = gateway.ChangeColor(color)
 		if err != nil {
 			panic(err)
@@ -30,7 +31,7 @@ func main() {
 		time.Sleep(time.Second)
 	}
 
-	err = gateway.Flashing(migateway.COLOR_RED)
+	err = gateway.Flashing(color.COLOR_RED)
 	if err != nil {
 		panic(err)
 	}

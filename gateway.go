@@ -2,6 +2,7 @@ package migateway
 
 import (
 	"errors"
+	mcolor "github.com/bingbaba/tool/color"
 	"image/color"
 	"time"
 )
@@ -38,7 +39,7 @@ func (g *GateWay) Set(dev *Device) {
 		g.IP = dev.GetData(FIELD_IP)
 	}
 	if dev.hasFiled(FIELD_GATEWAY_RGB) {
-		if g.RGB != RGBNumber(COLOR_BLACK) && g.RGB != 0 {
+		if g.RGB != RGBNumber(mcolor.COLOR_BLACK) && g.RGB != 0 {
 			LOGGER.Info("Save Last RGB:%d", g.RGB)
 			g.lastRGB = g.RGB
 		}
@@ -76,25 +77,26 @@ func (gwd *GateWay) ChangeBrightness(b int) error {
 		return gwd.TurnOff()
 	} else {
 		rgb := NewRGB(gwd.RGB)
-		rgb.Brightness(float64(b) / 100)
+		rgb.Brightness(uint8(b))
 		return gwd.ChangeColor(rgb)
 	}
 }
 
 func (gwd *GateWay) TurnOff() error {
-	return gwd.ChangeColor(COLOR_BLACK)
+	return gwd.ChangeColor(mcolor.COLOR_BLACK)
 }
 
 func (gwd *GateWay) TurnOn() error {
 	if gwd.RGB > 0 {
 		gwd.lastRGB = gwd.RGB
 	} else if gwd.lastRGB == 0 {
-		gwd.lastRGB = RGBNumber(COLOR_WHITE)
+		gwd.lastRGB = RGBNumber(mcolor.COLOR_WHITE)
 		LOGGER.Warn("Use Default RGB:%d", gwd.lastRGB)
 	}
 
 	rgb := NewRGB(gwd.lastRGB)
-	LOGGER.Warn("Change Color %d,%d,%d", rgb.r, rgb.g, rgb.b)
+	r, g, b, a := rgb.RGBA_8bit()
+	LOGGER.Warn("Change Color %d,%d,%d,%d", r, g, b, a)
 	return gwd.ChangeColor(rgb)
 }
 
@@ -115,7 +117,7 @@ func (gwd *GateWay) Flashing(c color.Color) error {
 
 func (gwd *GateWay) flashingOnce(c color.Color, interval time.Duration) error {
 	updata := map[string]interface{}{FIELD_GATEWAY_RGB: RGBNumber(c)}
-	downdata := map[string]interface{}{FIELD_GATEWAY_RGB: RGBNumber(COLOR_BLACK)}
+	downdata := map[string]interface{}{FIELD_GATEWAY_RGB: RGBNumber(mcolor.COLOR_BLACK)}
 
 	err := gwd.conn.Control(gwd.Device, updata)
 	if err != nil {
