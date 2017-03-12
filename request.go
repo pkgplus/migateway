@@ -63,7 +63,8 @@ var (
 )
 
 func newWriteRequest(dev *Device, aesKey string, data map[string]interface{}) (*Request, error) {
-	if dev.Token == "" {
+	//if dev.Token == "" {
+	if dev.conn.token == "" {
 		return nil, errors.New(fmt.Sprintf("the %s(%s) device's token is null!", dev.Model, dev.Sid))
 	}
 
@@ -74,7 +75,8 @@ func newWriteRequest(dev *Device, aesKey string, data map[string]interface{}) (*
 	}
 	mode := cipher.NewCBCEncrypter(block, iv)
 	ciphertext := make([]byte, 16)
-	mode.CryptBlocks(ciphertext, []byte(dev.Token))
+	//mode.CryptBlocks(ciphertext, []byte(dev.Token))
+	mode.CryptBlocks(ciphertext, []byte(dev.conn.token))
 
 	data["key"] = fmt.Sprintf("%X", ciphertext)
 	bytes, _ := json.Marshal(data)

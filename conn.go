@@ -20,6 +20,8 @@ type GateWayConn struct {
 	RecvGWMsgs chan []byte
 	devMsgs    chan *Device
 	*Configure
+
+	token string
 }
 
 func NewConn(c *Configure) *GateWayConn {

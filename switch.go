@@ -14,7 +14,7 @@ type Switch struct {
 }
 
 func NewSwitch(dev *Device) *Switch {
-	dev.ReportChan = make(chan bool, 1)
+	dev.ReportChan = make(chan interface{}, 1)
 	return &Switch{
 		Device:  dev,
 		Battery: dev.GetDataAsInt(FIELD_BATTERY),
@@ -22,26 +22,18 @@ func NewSwitch(dev *Device) *Switch {
 }
 
 func (s *Switch) Set(dev *Device) {
-	if s.hasFiled(FIELD_BATTERY) {
-		s.Battery = s.GetDataAsInt(FIELD_BATTERY)
+	if dev.hasFiled(FIELD_BATTERY) {
+		s.Battery = dev.GetDataAsInt(FIELD_BATTERY)
 	}
+
+	if dev.hasFiled(FIELD_STATUS) {
+		status := dev.GetData(FIELD_STATUS)
+		s.report(status)
+
+		//LOGGER.Warn("%s", status)
+	}
+
 	if dev.Token != "" {
 		s.Token = dev.Token
-	}
-}
-
-func (s *Switch) isClick(dev *Device) bool {
-	if dev.GetData(FIELD_STATUS) == SWITCH_STATUS_CLICK {
-		return true
-	} else {
-		return false
-	}
-}
-
-func (s *Switch) isDoubleClick(dev *Device) bool {
-	if dev.GetData(FIELD_STATUS) == SWITCH_STATUS_DOUBLECLICK {
-		return true
-	} else {
-		return false
 	}
 }

@@ -131,10 +131,7 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 
 	LOGGER.Debug("save to report chan...")
 	if saveDev != nil {
-		select {
-		case saveDev.ReportChan <- true:
-		default:
-		}
+		saveDev.report(true)
 	}
 	LOGGER.Debug("save to report chan over!")
 
@@ -165,7 +162,8 @@ func (m *AqaraManager) discovery() (err error) {
 	if !conn.communicate(NewDevListRequest(), devListResp) {
 		return errors.New("show device list error")
 	}
-	gateway.setToken(devListResp.Token)
+	//gateway.setToken(devListResp.Token)
+	gateway.conn.token = devListResp.Token
 
 	//every device
 	for index, sid := range devListResp.getSidArray() {

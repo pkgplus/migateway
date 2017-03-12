@@ -17,7 +17,7 @@ type Plug struct {
 }
 
 func NewPlug(dev *Device) *Plug {
-	dev.ReportChan = make(chan bool, 1)
+	dev.ReportChan = make(chan interface{}, 1)
 	p := &Plug{Device: dev}
 	p.Set(dev)
 	return p
@@ -42,4 +42,18 @@ func (p *Plug) Set(dev *Device) {
 	if dev.Token != "" {
 		p.Token = dev.Token
 	}
+}
+
+func (p *Plug) TurnOn() error {
+	data := map[string]interface{}{
+		FIELD_STATUS: "on",
+	}
+	return p.conn.Control(p.Device, data)
+}
+
+func (p *Plug) TurnOff() error {
+	data := map[string]interface{}{
+		FIELD_STATUS: "off",
+	}
+	return p.conn.Control(p.Device, data)
 }

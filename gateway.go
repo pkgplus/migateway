@@ -28,7 +28,7 @@ type GateWay struct {
 }
 
 func NewGateWay(dev *Device) *GateWay {
-	dev.ReportChan = make(chan bool, 1)
+	dev.ReportChan = make(chan interface{}, 1)
 	g := &GateWay{Device: dev}
 	g.Set(dev)
 	return g
@@ -46,7 +46,7 @@ func (g *GateWay) Set(dev *Device) {
 		g.RGB = dev.GetDataAsUint32(FIELD_GATEWAY_RGB)
 	}
 	if dev.Token != "" {
-		g.Token = dev.Token
+		g.setToken(dev.Token)
 	}
 	if dev.ShortID > 0 {
 		g.ShortID = dev.ShortID
@@ -57,6 +57,11 @@ func (g *GateWay) Set(dev *Device) {
 			LOGGER.Error("exec callback error:%v", err)
 		}
 	}
+}
+
+func (g *GateWay) setToken(token string) {
+	g.Token = token
+	g.conn.token = token
 }
 
 func (gwd *GateWay) RegisterCb(cb func(gw *GateWay) error) {

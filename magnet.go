@@ -11,7 +11,7 @@ type Magnet struct {
 }
 
 func NewMagnet(dev *Device) *Magnet {
-	dev.ReportChan = make(chan bool, 1)
+	dev.ReportChan = make(chan interface{}, 1)
 	return &Magnet{
 		Device: dev,
 		Opened: dev.GetDataAsBool(FIELD_STATUS),
@@ -20,7 +20,12 @@ func NewMagnet(dev *Device) *Magnet {
 
 func (m *Magnet) Set(dev *Device) {
 	if dev.hasFiled(FIELD_STATUS) {
-		m.Opened = dev.GetDataAsBool(FIELD_STATUS)
+		status := dev.GetData(FIELD_STATUS)
+		if status == "open" {
+			m.Opened = true
+		} else {
+			m.Opened = false
+		}
 	}
 
 	if dev.hasFiled(FIELD_BATTERY) {
