@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -14,6 +15,9 @@ const (
 )
 
 type GateWayConn struct {
+	conn      *net.UDPConn
+	connMutex sync.RWMutex
+
 	SendMsgs   chan []byte
 	RecvMsgs   chan []byte
 	SendGWMsgs chan []byte
@@ -198,34 +202,38 @@ func (gwc *GateWayConn) communicate(req *Request, resp Response) bool {
 	return false
 }
 
-func (gwc *GateWayConn) initGateWay(ip string) error {
-	UDP_ADDR := &net.UDPAddr{
-		IP:   net.ParseIP(ip),
-		Port: SERVER_PORT,
-	}
-	con, err := net.DialUDP("udp4", nil, UDP_ADDR)
+func (gwc *GateWayConn) initGateWay(ip string) (err error) {
+	err = gwc.resetGWConn(ip)
 	if err != nil {
-		return err
+		return
 	}
 
+	//write
 	go func() {
-		defer con.Close()
-		for {
-			msg := <-gwc.SendGWMsgs
+		defer gwc.conn.Close()
+		for msg := range gwc.SendGWMsgs {
 			LOGGER.Info("GATEWAY:: send msg: %s", msg)
-			_, werr := con.Write([]byte(msg))
+
+			gwc.connMutex.RLock()
+			defer gwc.connMutex.RUnlock()
+			_, werr := gwc.conn.Write([]byte(msg))
 			if werr != nil {
 				LOGGER.Error("send error %v", werr)
 			}
 		}
 	}()
 
+	//read
 	go func() {
 		buf := make([]byte, 2048)
 		for {
-			size, _, err2 := con.ReadFromUDP(buf)
+			gwc.connMutex.RLock()
+			defer gwc.connMutex.RUnlock()
+
+			size, _, err2 := gwc.conn.ReadFromUDP(buf)
 			if err2 != nil {
-				panic(err2)
+				//panic(err2)
+				LOGGER.Error("GATEWAY:: recv error: %v", err2)
 			} else if size > 0 {
 				LOGGER.Debug("GATEWAY:: recv msg: %s", string(buf[0:size]))
 				gwc.RecvGWMsgs <- buf[0:size]
@@ -233,7 +241,30 @@ func (gwc *GateWayConn) initGateWay(ip string) error {
 		}
 	}()
 
-	return nil
+	return
+}
+
+func (gwc *GateWayConn) resetGWConn(ip string) (err error) {
+	gwc.connMutex.Lock()
+	defer gwc.connMutex.Unlock()
+
+	UDP_ADDR := &net.UDPAddr{
+		IP:   net.ParseIP(ip),
+		Port: SERVER_PORT,
+	}
+
+	//close
+	if gwc.conn != nil {
+		gwc.conn.Close()
+	}
+
+	//open new conn
+	gwc.conn, err = net.DialUDP("udp4", nil, UDP_ADDR)
+	if err != nil {
+		return
+	}
+
+	return
 }
 
 func (gwc *GateWayConn) getChan(cmd string) chan []byte {
