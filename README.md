@@ -22,7 +22,7 @@
 [migateway for homekit](https://github.com/xuebing1110/gohomekit)
 
 ### Screenshot
-![手机](http://download.bingbaba.com/images/homekit_iphone.png)
+![手机](http://download.bingbaba.com/images/gohomekit_iphone.png)
 
 ## EXAMPLE
 ```golang
