@@ -22,11 +22,11 @@ func NewSwitch(dev *Device) *Switch {
 }
 
 func (s *Switch) Set(dev *Device) {
-	if dev.hasFiled(FIELD_BATTERY) {
+	if dev.hasField(FIELD_BATTERY) {
 		s.Battery = dev.GetDataAsInt(FIELD_BATTERY)
 	}
 
-	if dev.hasFiled(FIELD_STATUS) {
+	if dev.hasField(FIELD_STATUS) {
 		status := dev.GetData(FIELD_STATUS)
 		s.report(status)
 

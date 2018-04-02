@@ -35,10 +35,10 @@ func NewGateWay(dev *Device) *GateWay {
 }
 
 func (g *GateWay) Set(dev *Device) {
-	if dev.hasFiled(FIELD_IP) {
+	if dev.hasField(FIELD_IP) {
 		g.IP = dev.GetData(FIELD_IP)
 	}
-	if dev.hasFiled(FIELD_GATEWAY_RGB) {
+	if dev.hasField(FIELD_GATEWAY_RGB) {
 		if g.RGB != 0 {
 			LOGGER.Warn("Save Last RGB:%d", g.RGB)
 			g.lastRGB = g.RGB

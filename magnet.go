@@ -19,7 +19,7 @@ func NewMagnet(dev *Device) *Magnet {
 }
 
 func (m *Magnet) Set(dev *Device) {
-	if dev.hasFiled(FIELD_STATUS) {
+	if dev.hasField(FIELD_STATUS) {
 		status := dev.GetData(FIELD_STATUS)
 		if status == "open" {
 			m.Opened = true
@@ -28,7 +28,7 @@ func (m *Magnet) Set(dev *Device) {
 		}
 	}
 
-	if dev.hasFiled(FIELD_BATTERY) {
+	if dev.hasField(FIELD_BATTERY) {
 		m.Battery = dev.GetDataAsUint32(FIELD_BATTERY)
 	}
 

@@ -24,19 +24,19 @@ func NewPlug(dev *Device) *Plug {
 }
 
 func (p *Plug) Set(dev *Device) {
-	if dev.hasFiled(FIELD_INUSE) {
+	if dev.hasField(FIELD_INUSE) {
 		p.InUse = dev.GetDataAsBool(FIELD_INUSE)
 	}
-	if dev.hasFiled(FIELD_STATUS) {
+	if dev.hasField(FIELD_STATUS) {
 		p.IsOn = dev.GetDataAsBool(FIELD_STATUS)
 	}
-	if dev.hasFiled(FIELD_PLUG_LOADVOLTAGE) {
+	if dev.hasField(FIELD_PLUG_LOADVOLTAGE) {
 		p.LoadVoltage = dev.GetDataAsUint32(FIELD_PLUG_LOADVOLTAGE)
 	}
-	if dev.hasFiled(FIELD_PLUG_LOADPOWER) {
+	if dev.hasField(FIELD_PLUG_LOADPOWER) {
 		p.LoadPower = dev.GetDataAsUint32(FIELD_PLUG_LOADPOWER)
 	}
-	if dev.hasFiled(FIELD_PLUG_POWERCONSUMED) {
+	if dev.hasField(FIELD_PLUG_POWERCONSUMED) {
 		p.PowerConsumed = dev.GetDataAsUint32(FIELD_PLUG_POWERCONSUMED)
 	}
 	if dev.Token != "" {

@@ -2,8 +2,9 @@ package migateway
 
 import (
 	"errors"
-	"github.com/bingbaba/util/logs"
 	"time"
+
+	"github.com/bingbaba/util/logs"
 )
 
 var (

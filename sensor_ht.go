@@ -23,11 +23,11 @@ func NewSensorHt(dev *Device) *SensorHT {
 }
 
 func (s *SensorHT) Set(dev *Device) {
-	if dev.hasFiled(FIELD_SENSORHT_TEMPERATURE) {
+	if dev.hasField(FIELD_SENSORHT_TEMPERATURE) {
 		s.Temperature = dev.GetDataAsFloat64(FIELD_SENSORHT_TEMPERATURE) / 100
 	}
 
-	if dev.hasFiled(FIELD_SENSORHT_HUMIDITY) {
+	if dev.hasField(FIELD_SENSORHT_HUMIDITY) {
 		s.Humidity = dev.GetDataAsFloat64(FIELD_SENSORHT_HUMIDITY) / 100
 	}
 	if dev.Token != "" {

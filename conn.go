@@ -40,7 +40,7 @@ func NewConn(c *Configure) *GateWayConn {
 }
 
 func (gwc *GateWayConn) Control(dev *Device, data map[string]interface{}) error {
-	//wait the device mulitcast heartbeat message
+	// wait for multicast heartbeat message from device
 	if !dev.waitToken() {
 		return errors.New("wait heartbeat TIMEOUT!!!")
 	}
@@ -56,14 +56,14 @@ func (gwc *GateWayConn) Control(dev *Device, data map[string]interface{}) error 
 func (gwc *GateWayConn) Send(req *Request) bool {
 	if req == nil {
 		return false
-	} else {
-		if req.Cmd == CMD_WHOIS {
-			gwc.multicast(req)
-		} else {
-			gwc.sendGW(req)
-		}
-		return true
 	}
+
+	if req.Cmd == CMD_WHOIS {
+		gwc.multicast(req)
+	} else {
+		gwc.sendGW(req)
+	}
+	return true
 }
 
 func (gwc *GateWayConn) waitDevice(sid string) *Device {
@@ -114,6 +114,10 @@ func (gwc *GateWayConn) initMultiCast() error {
 					resp.freshHeartTime()
 					gwc.devMsgs <- resp.Device
 				} else {
+					// WARNING:
+					// A slice reference is pushed on the channel, afterwards the code above can
+					// read new data into 'buf' which will change the content of the slice that was
+					// just pushed here. We should push a copy of the data here instead of a 'reference'.
 					gwc.RecvMsgs <- buf[0:size]
 				}
 
@@ -227,6 +231,9 @@ func (gwc *GateWayConn) initGateWay(ip string) (err error) {
 	go func() {
 		buf := make([]byte, 2048)
 		for {
+			// QUESTION: Why are we protecting 'gwc.conn' with a mutex?
+			// According to the documentation you can read and write from
+			// net.conn frin multiple go routines
 			gwc.connMutex.RLock()
 			defer gwc.connMutex.RUnlock()
 
@@ -236,6 +243,10 @@ func (gwc *GateWayConn) initGateWay(ip string) (err error) {
 				LOGGER.Error("GATEWAY:: recv error: %v", err2)
 			} else if size > 0 {
 				LOGGER.Debug("GATEWAY:: recv msg: %s", string(buf[0:size]))
+				// WARNING:
+				// A slice reference is pushed on the channel, afterwards the code above can
+				// read new data into 'buf' which will change the content of the slice that was
+				// just pushed here. We should push a copy of the data here instead of a 'reference'.
 				gwc.RecvGWMsgs <- buf[0:size]
 			}
 		}
@@ -270,7 +281,6 @@ func (gwc *GateWayConn) resetGWConn(ip string) (err error) {
 func (gwc *GateWayConn) getChan(cmd string) chan []byte {
 	if cmd == CMD_WHOIS {
 		return gwc.RecvMsgs
-	} else {
-		return gwc.RecvGWMsgs
 	}
+	return gwc.RecvGWMsgs
 }

@@ -31,14 +31,14 @@ func (m *Motion) Set(dev *Device) {
 	last := m.IsMotorial
 	ct := time.Now().Unix()
 
-	if dev.hasFiled(FIELD_STATUS) {
+	if dev.hasField(FIELD_STATUS) {
 		m.IsMotorial = dev.GetDataAsBool(FIELD_STATUS)
 
 		if m.IsMotorial {
 			m.lastMotionTime = ct
 		}
 
-	} else if dev.hasFiled("no_motion") {
+	} else if dev.hasField("no_motion") {
 		m.IsMotorial = false
 		m.NoMotionTime = dev.GetDataAsInt("no_motion")
 	}

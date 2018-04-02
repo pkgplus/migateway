@@ -67,7 +67,7 @@ func (d *Device) waitToken() bool {
 	return false
 }
 
-func (d *Device) hasFiled(field string) (found bool) {
+func (d *Device) hasField(field string) (found bool) {
 	if d.Data == "" {
 		return false
 	}
@@ -85,11 +85,9 @@ func (d *Device) hasFiled(field string) (found bool) {
 }
 
 func (d *Device) GetData(field string) string {
-	if d.hasFiled(field) {
+	if d.hasField(field) {
 		v, found := d.dataMap[field]
-		if !found {
-			return ""
-		} else {
+		if found {
 			switch reflect.TypeOf(v).Kind() {
 			case reflect.Int:
 				return fmt.Sprintf("%d", v.(int))
@@ -102,9 +100,8 @@ func (d *Device) GetData(field string) string {
 				return ""
 			}
 		}
-	} else {
-		return ""
 	}
+	return ""
 }
 
 func (d *Device) GetDataAsBool(field string) bool {
@@ -115,9 +112,8 @@ func (d *Device) GetDataAsBool(field string) bool {
 		v == "true" ||
 		v == "motion" {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 func (d *Device) GetDataAsInt(field string) int {
