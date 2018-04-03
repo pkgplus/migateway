@@ -15,12 +15,13 @@ var (
 type AqaraManager struct {
 	reportChan chan *Device
 
-	GateWay   *GateWay
-	Motions   map[string]*Motion
-	Switchs   map[string]*Switch
-	SensorHTs map[string]*SensorHT
-	Magnets   map[string]*Magnet
-	Plugs     map[string]*Plug
+	GateWay           *GateWay
+	Motions           map[string]*Motion
+	Switchs           map[string]*Switch
+	DualWiredSwitches map[string]*DualWiredWallSwitch
+	SensorHTs         map[string]*SensorHT
+	Magnets           map[string]*Magnet
+	Plugs             map[string]*Plug
 
 	DiscoveryTime    int64
 	FreshDevListTime int64
@@ -98,6 +99,15 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 			m.Switchs[dev.Sid] = NewSwitch(dev)
 		}
 		saveDev = m.Switchs[dev.Sid].Device
+	case MODEL_DUALWIREDSWITCH:
+		d, found := m.DualWiredSwitches[dev.Sid]
+		if found {
+			d.Set(dev)
+		} else {
+			dev.conn = gateway.conn
+			m.DualWiredSwitches[dev.Sid] = NewDualWiredSwitch(dev)
+		}
+		saveDev = m.DualWiredSwitches[dev.Sid].Device
 	case MODEL_SENSORHT:
 		d, found := m.SensorHTs[dev.Sid]
 		if found {

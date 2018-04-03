@@ -18,6 +18,8 @@ type GateWayConn struct {
 	conn      *net.UDPConn
 	connMutex sync.RWMutex
 
+	closeRead  chan bool
+	closeWrite chan bool
 	SendMsgs   chan []byte
 	RecvMsgs   chan []byte
 	SendGWMsgs chan []byte
@@ -30,6 +32,8 @@ type GateWayConn struct {
 
 func NewConn(c *Configure) *GateWayConn {
 	return &GateWayConn{
+		closeRead:  make(chan bool),
+		closeWrite: make(chan bool),
 		SendMsgs:   make(chan []byte),
 		RecvMsgs:   make(chan []byte, 100),
 		SendGWMsgs: make(chan []byte),
@@ -207,22 +211,39 @@ func (gwc *GateWayConn) communicate(req *Request, resp Response) bool {
 }
 
 func (gwc *GateWayConn) initGateWay(ip string) (err error) {
-	err = gwc.resetGWConn(ip)
+
+	//do we first need to close an existing connection ?
+	if gwc.conn != nil {
+		// Signal the read and write go-routine to terminate
+		gwc.closeRead <- true
+		gwc.closeWrite <- true
+		gwc.conn.Close()
+		gwc.conn = nil
+	}
+
+	UDPAddr := &net.UDPAddr{
+		IP:   net.ParseIP(ip),
+		Port: SERVER_PORT,
+	}
+
+	//open new conn
+	gwc.conn, err = net.DialUDP("udp4", nil, UDPAddr)
 	if err != nil {
 		return
 	}
 
 	//write
 	go func() {
-		defer gwc.conn.Close()
-		for msg := range gwc.SendGWMsgs {
-			LOGGER.Info("GATEWAY:: send msg: %s", msg)
-
-			gwc.connMutex.RLock()
-			defer gwc.connMutex.RUnlock()
-			_, werr := gwc.conn.Write([]byte(msg))
-			if werr != nil {
-				LOGGER.Error("send error %v", werr)
+		for {
+			select {
+			case <-gwc.closeWrite:
+				return
+			case msg := <-gwc.SendGWMsgs:
+				LOGGER.Info("GATEWAY:: send msg: %s", msg)
+				_, werr := gwc.conn.Write([]byte(msg))
+				if werr != nil {
+					LOGGER.Error("send error %v", werr)
+				}
 			}
 		}
 	}()
@@ -231,49 +252,23 @@ func (gwc *GateWayConn) initGateWay(ip string) (err error) {
 	go func() {
 		buf := make([]byte, 2048)
 		for {
-			// QUESTION: Why are we protecting 'gwc.conn' with a mutex?
-			// According to the documentation you can read and write from
-			// net.conn frin multiple go routines
-			gwc.connMutex.RLock()
-			defer gwc.connMutex.RUnlock()
-
-			size, _, err2 := gwc.conn.ReadFromUDP(buf)
-			if err2 != nil {
-				//panic(err2)
-				LOGGER.Error("GATEWAY:: recv error: %v", err2)
-			} else if size > 0 {
-				LOGGER.Debug("GATEWAY:: recv msg: %s", string(buf[0:size]))
-				// WARNING:
-				// A slice reference is pushed on the channel, afterwards the code above can
-				// read new data into 'buf' which will change the content of the slice that was
-				// just pushed here. We should push a copy of the data here instead of a 'reference'.
-				gwc.RecvGWMsgs <- buf[0:size]
+			select {
+			case <-gwc.closeRead:
+				return
+			default:
+				size, _, err2 := gwc.conn.ReadFromUDP(buf)
+				if err2 != nil {
+					//panic(err2)
+					LOGGER.Error("GATEWAY:: recv error: %v", err2)
+				} else if size > 0 {
+					LOGGER.Debug("GATEWAY:: recv msg: %s", string(buf[0:size]))
+					msg := make([]byte, size)
+					copy(msg, buf[0:size])
+					gwc.RecvGWMsgs <- msg
+				}
 			}
 		}
 	}()
-
-	return
-}
-
-func (gwc *GateWayConn) resetGWConn(ip string) (err error) {
-	gwc.connMutex.Lock()
-	defer gwc.connMutex.Unlock()
-
-	UDP_ADDR := &net.UDPAddr{
-		IP:   net.ParseIP(ip),
-		Port: SERVER_PORT,
-	}
-
-	//close
-	if gwc.conn != nil {
-		gwc.conn.Close()
-	}
-
-	//open new conn
-	gwc.conn, err = net.DialUDP("udp4", nil, UDP_ADDR)
-	if err != nil {
-		return
-	}
 
 	return
 }

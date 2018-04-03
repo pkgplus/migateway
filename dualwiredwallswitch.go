@@ -1,9 +1,9 @@
 package migateway
 
 const (
-	MODEL_SWITCH   = "ctrl_neutral2"
-	FIELD_CHANNEL0 = "channel_0"
-	FIELD_CHANNEL1 = "channel_1"
+	MODEL_DUALWIREDSWITCH = "ctrl_neutral2"
+	FIELD_CHANNEL0        = "channel_0"
+	FIELD_CHANNEL1        = "channel_1"
 )
 
 // DualWiredWallSwitch is a wired wall switch with 2 switches to control to power-lines.
@@ -14,7 +14,7 @@ type DualWiredWallSwitch struct {
 	Channel1On bool
 }
 
-func NewSwitch(dev *Device) *DualWiredWallSwitch {
+func NewDualWiredSwitch(dev *Device) *DualWiredWallSwitch {
 	dev.ReportChan = make(chan interface{}, 1)
 	return &DualWiredWallSwitch{
 		Device:     dev,
