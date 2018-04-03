@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
-	"sync"
 	"time"
 )
 
@@ -15,9 +14,7 @@ const (
 )
 
 type GateWayConn struct {
-	conn      *net.UDPConn
-	connMutex sync.RWMutex
-
+	conn       *net.UDPConn
 	closeRead  chan bool
 	closeWrite chan bool
 	SendMsgs   chan []byte
@@ -46,7 +43,7 @@ func NewConn(c *Configure) *GateWayConn {
 func (gwc *GateWayConn) Control(dev *Device, data map[string]interface{}) error {
 	// wait for multicast heartbeat message from device
 	if !dev.waitToken() {
-		return errors.New("wait heartbeat TIMEOUT!!!")
+		return errors.New("ERROR: heartbeat timeout")
 	}
 
 	req, err := newWriteRequest(dev, gwc.Configure.AESKey, data)
@@ -87,12 +84,12 @@ func (gwc *GateWayConn) waitDevice(sid string) *Device {
 
 func (gwc *GateWayConn) initMultiCast() error {
 	//listen
-	udp_l := &net.UDPAddr{IP: net.ParseIP(MULTICAST_ADDR), Port: SERVER_PORT}
-	con, err := net.ListenMulticastUDP("udp4", nil, udp_l)
+	udpaddr := &net.UDPAddr{IP: net.ParseIP(MULTICAST_ADDR), Port: SERVER_PORT}
+	con, err := net.ListenMulticastUDP("udp4", nil, udpaddr)
 	if err != nil {
 		return err
 	}
-	LOGGER.Info("listennig %d ...", SERVER_PORT)
+	LOGGER.Info("listening %d ...", SERVER_PORT)
 
 	//read
 	go func() {
@@ -118,11 +115,9 @@ func (gwc *GateWayConn) initMultiCast() error {
 					resp.freshHeartTime()
 					gwc.devMsgs <- resp.Device
 				} else {
-					// WARNING:
-					// A slice reference is pushed on the channel, afterwards the code above can
-					// read new data into 'buf' which will change the content of the slice that was
-					// just pushed here. We should push a copy of the data here instead of a 'reference'.
-					gwc.RecvMsgs <- buf[0:size]
+					msg := make([]byte, size)
+					copy(msg, buf[0:size])
+					gwc.RecvMsgs <- msg
 				}
 
 			}
@@ -130,14 +125,14 @@ func (gwc *GateWayConn) initMultiCast() error {
 	}()
 
 	//write
-	MULTI_UDP_ADDR := &net.UDPAddr{
+	udpaddrMulticast := &net.UDPAddr{
 		IP:   net.ParseIP(MULTICAST_ADDR),
 		Port: MULTICAST_PORT,
 	}
 	go func() {
 		for {
 			msg := <-gwc.SendMsgs
-			wsize, err3 := con.WriteToUDP(msg, MULTI_UDP_ADDR)
+			wsize, err3 := con.WriteToUDP(msg, udpaddrMulticast)
 			if err3 != nil {
 				panic(err3)
 			}
@@ -218,7 +213,6 @@ func (gwc *GateWayConn) initGateWay(ip string) (err error) {
 		gwc.closeRead <- true
 		gwc.closeWrite <- true
 		gwc.conn.Close()
-		gwc.conn = nil
 	}
 
 	UDPAddr := &net.UDPAddr{
