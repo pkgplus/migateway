@@ -24,20 +24,20 @@ type Device struct {
 	Data              string `json:"data,omitempty"`
 	Token             string `json:"token,omitempty"`
 
-	heartBeatTime int64
-	dataMap       map[string]interface{}
+	heartBeatTimestamp int64
+	dataMap            map[string]interface{}
 }
 
 func (d *Device) RefreshStatus() error {
 	return nil
 }
 
-func (d *Device) freshHeartTime() {
-	d.heartBeatTime = time.Now().Unix()
+func (d *Device) setHeartbeatTimestamp() {
+	d.heartBeatTimestamp = time.Now().Unix()
 }
 
-func (d *Device) GetHeartTime() int64 {
-	return d.heartBeatTime
+func (d *Device) GetHeartbeatTimestamp() int64 {
+	return d.heartBeatTimestamp
 }
 
 func (d *Device) waitToken() bool {
@@ -45,7 +45,7 @@ func (d *Device) waitToken() bool {
 	for {
 		ct := time.Now().Unix()
 		if d.GatewayConnection.token != "" &&
-			d.heartBeatTime-ct <= 7200 {
+			d.heartBeatTimestamp-ct <= 7200 {
 			return true
 		} else if ct-begin >= 30 {
 			return false
@@ -95,11 +95,7 @@ func (d *Device) GetData(field string) string {
 
 func (d *Device) GetDataAsBool(field string) bool {
 	v := d.GetData(field)
-	if v == "1" ||
-		v == "open" ||
-		v == "on" ||
-		v == "true" ||
-		v == "motion" {
+	if v == "1" || v == "open" || v == "on" || v == "true" || v == "motion" {
 		return true
 	}
 	return false

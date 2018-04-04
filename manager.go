@@ -21,6 +21,8 @@ type AqaraManager struct {
 	Magnets           map[string]*Magnet
 	Plugs             map[string]*Plug
 
+	StateMessages chan interface{}
+
 	DiscoveryTime    int64
 	FreshDevListTime int64
 }
@@ -44,6 +46,7 @@ func NewAqaraManager(c *Configure) (m *AqaraManager, err error) {
 		SensorHTs:     make(map[string]*SensorHT),
 		Magnets:       make(map[string]*Magnet),
 		Plugs:         make(map[string]*Plug),
+		StateMessages: make(chan interface{}),
 		DiscoveryTime: time.Now().Unix(),
 	}
 
@@ -153,7 +156,7 @@ func (m *AqaraManager) whois(conn *GateWayConn) {
 	conn.communicate(NewWhoisRequest(), iamResp)
 
 	//gateway infomation
-	dev := NewGateWay(iamResp.Device)
+	dev := NewGateWay(iamResp.Device, m.StateMessages)
 	dev.IP = iamResp.IP
 	dev.Port = iamResp.Port
 	dev.Gateway = dev

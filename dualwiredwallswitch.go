@@ -19,6 +19,7 @@ type DualWiredWallSwitchState struct {
 }
 
 type DualWiredWallSwitchStateChange struct {
+	ID   string
 	From DualWiredWallSwitchState
 	To   DualWiredWallSwitchState
 }
@@ -35,8 +36,7 @@ func NewDualWiredSwitch(dev *Device) *DualWiredWallSwitch {
 }
 
 func (s *DualWiredWallSwitch) Set(dev *Device) {
-
-	change := DualWiredWallSwitchStateChange{From: s.State, To: s.State}
+	change := DualWiredWallSwitchStateChange{ID: s.Sid, From: s.State, To: s.State}
 	if dev.hasField(FIELD_CHANNEL0) {
 		channel0 := dev.GetDataAsBool(FIELD_CHANNEL0)
 		s.State.Channel0On = channel0

@@ -18,6 +18,7 @@ type SensorHTState struct {
 }
 
 type SensorHTStateChange struct {
+	ID   string
 	From SensorHTState
 	To   SensorHTState
 }
@@ -34,7 +35,7 @@ func NewSensorHt(dev *Device) *SensorHT {
 }
 
 func (s *SensorHT) Set(dev *Device) {
-	change := SensorHTStateChange{From: s.State, To: s.State}
+	change := SensorHTStateChange{ID: s.Sid, From: s.State, To: s.State}
 	if dev.hasField(FIELD_SENSORHT_TEMPERATURE) {
 		s.State.Temperature = dev.GetDataAsFloat64(FIELD_SENSORHT_TEMPERATURE) / 100
 	}

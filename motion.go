@@ -19,6 +19,7 @@ type MotionState struct {
 }
 
 type MotionStateChange struct {
+	ID   string
 	From MotionState
 	To   MotionState
 }
@@ -39,7 +40,7 @@ func NewMotion(dev *Device) *Motion {
 
 func (m *Motion) Set(dev *Device) {
 	timestamp := time.Now()
-	change := MotionStateChange{From: m.State, To: m.State}
+	change := MotionStateChange{ID: m.Sid, From: m.State, To: m.State}
 	if dev.hasField(FIELD_STATUS) {
 		m.State.HasMotion = dev.GetDataAsBool(FIELD_STATUS)
 		if m.State.HasMotion {

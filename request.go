@@ -4,7 +4,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/json"
-	"errors"
 	"fmt"
 )
 
@@ -40,9 +39,8 @@ func toBytes(v interface{}) []byte {
 func (r *Request) getChanName() string {
 	if r.Cmd == CMD_WHOIS {
 		return "MULTICAST"
-	} else {
-		return "GATEWAY"
 	}
+	return "GATEWAY"
 }
 
 func (r *Request) expectCmd() string {
@@ -63,19 +61,16 @@ var (
 )
 
 func newWriteRequest(dev *Device, aesKey string, data map[string]interface{}) (*Request, error) {
-	//if dev.Token == "" {
 	if dev.GatewayConnection.token == "" {
-		return nil, errors.New(fmt.Sprintf("the %s(%s) device's token is null!", dev.Model, dev.Sid))
+		return nil, fmt.Errorf(fmt.Sprintf("the %s(%s) device's token is null", dev.Model, dev.Sid))
 	}
 
-	key_bytes := []byte(aesKey)
-	block, err := aes.NewCipher(key_bytes)
+	block, err := aes.NewCipher([]byte(aesKey))
 	if err != nil {
 		return nil, err
 	}
 	mode := cipher.NewCBCEncrypter(block, iv)
 	ciphertext := make([]byte, 16)
-	//mode.CryptBlocks(ciphertext, []byte(dev.Token))
 	mode.CryptBlocks(ciphertext, []byte(dev.GatewayConnection.token))
 
 	data["key"] = fmt.Sprintf("%X", ciphertext)

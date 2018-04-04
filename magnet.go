@@ -11,10 +11,11 @@ type Magnet struct {
 
 type MagnetState struct {
 	Opened  bool
-	Battery uint32
+	Battery float64
 }
 
 type MagnetStateChange struct {
+	ID   string
 	From MagnetState
 	To   MagnetState
 }
@@ -30,9 +31,13 @@ func NewMagnet(dev *Device) *Magnet {
 	}
 }
 
+func convertToBatteryPercentage(battery uint32) float64 {
+	return float64(battery)
+}
+
 func (m *Magnet) Set(dev *Device) {
 
-	change := MagnetStateChange{From: m.State, To: m.State}
+	change := MagnetStateChange{ID: m.Sid, From: m.State, To: m.State}
 	if dev.hasField(FIELD_STATUS) {
 		status := dev.GetData(FIELD_STATUS)
 		if status == "open" {
@@ -43,7 +48,7 @@ func (m *Magnet) Set(dev *Device) {
 	}
 
 	if dev.hasField(FIELD_BATTERY) {
-		m.State.Battery = dev.GetDataAsUint32(FIELD_BATTERY)
+		m.State.Battery = convertToBatteryPercentage(dev.GetDataAsUint32(FIELD_BATTERY))
 	}
 
 	change.To = m.State

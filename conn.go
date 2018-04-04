@@ -112,7 +112,7 @@ func (gwc *GateWayConn) initMultiCast() error {
 				if resp.Cmd == CMD_REPORT {
 					gwc.devMsgs <- resp.Device
 				} else if resp.Cmd == CMD_HEARTBEAT {
-					resp.freshHeartTime()
+					resp.setHeartbeatTimestamp()
 					gwc.devMsgs <- resp.Device
 				} else {
 					msg := make([]byte, size)

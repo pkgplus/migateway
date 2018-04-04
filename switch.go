@@ -23,6 +23,20 @@ const (
 	LongReleaseClick
 )
 
+func (c ClickType) String() string {
+	switch c {
+	case SingleClick:
+		return "single"
+	case DoubleClick:
+		return "double"
+	case LongPressClick:
+		return "longpress"
+	case LongReleaseClick:
+		return "longrelease"
+	}
+	return "none"
+}
+
 //GateWay Status
 type Switch struct {
 	*Device
@@ -30,11 +44,12 @@ type Switch struct {
 }
 
 type SwitchState struct {
-	Battery int
+	Battery float64
 	Click   ClickType
 }
 
 type SwitchStateChange struct {
+	ID   string
 	From SwitchState
 	To   SwitchState
 }
@@ -44,18 +59,20 @@ func (s SwitchStateChange) IsChanged() bool {
 }
 
 func NewSwitch(dev *Device) *Switch {
+	battery := convertToBatteryPercentage(dev.GetDataAsUint32(FIELD_BATTERY))
 	return &Switch{
 		Device: dev,
-		State:  SwitchState{Battery: dev.GetDataAsInt(FIELD_BATTERY), Click: NoClick},
+		State:  SwitchState{Battery: battery, Click: NoClick},
 	}
 }
 
 func (s *Switch) Set(dev *Device) {
 	if dev.hasField(FIELD_BATTERY) {
-		s.State.Battery = dev.GetDataAsInt(FIELD_BATTERY)
+		battery := convertToBatteryPercentage(dev.GetDataAsUint32(FIELD_BATTERY))
+		s.State.Battery = battery
 	}
 
-	change := SwitchStateChange{From: s.State, To: s.State}
+	change := SwitchStateChange{ID: s.Sid, From: s.State, To: s.State}
 	if dev.hasField(FIELD_STATUS) {
 		status := dev.GetData(FIELD_STATUS)
 
