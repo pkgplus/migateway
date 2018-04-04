@@ -13,8 +13,6 @@ var (
 )
 
 type AqaraManager struct {
-	reportChan chan *Device
-
 	GateWay           *GateWay
 	Motions           map[string]*Motion
 	Switchs           map[string]*Switch
@@ -86,7 +84,7 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 		if found {
 			d.Set(dev)
 		} else {
-			dev.conn = gateway.conn
+			dev.GatewayConnection = gateway.GatewayConnection
 			m.Motions[dev.Sid] = NewMotion(dev)
 		}
 		saveDev = m.Motions[dev.Sid].Device
@@ -95,7 +93,7 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 		if found {
 			d.Set(dev)
 		} else {
-			dev.conn = gateway.conn
+			dev.GatewayConnection = gateway.GatewayConnection
 			m.Switchs[dev.Sid] = NewSwitch(dev)
 		}
 		saveDev = m.Switchs[dev.Sid].Device
@@ -104,7 +102,7 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 		if found {
 			d.Set(dev)
 		} else {
-			dev.conn = gateway.conn
+			dev.GatewayConnection = gateway.GatewayConnection
 			m.DualWiredSwitches[dev.Sid] = NewDualWiredSwitch(dev)
 		}
 		saveDev = m.DualWiredSwitches[dev.Sid].Device
@@ -113,7 +111,7 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 		if found {
 			d.Set(dev)
 		} else {
-			dev.conn = gateway.conn
+			dev.GatewayConnection = gateway.GatewayConnection
 			m.SensorHTs[dev.Sid] = NewSensorHt(dev)
 		}
 		saveDev = m.SensorHTs[dev.Sid].Device
@@ -122,7 +120,7 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 		if found {
 			d.Set(dev)
 		} else {
-			dev.conn = gateway.conn
+			dev.GatewayConnection = gateway.GatewayConnection
 			m.Magnets[dev.Sid] = NewMagnet(dev)
 		}
 		saveDev = m.Magnets[dev.Sid].Device
@@ -131,7 +129,7 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 		if found {
 			d.Set(dev)
 		} else {
-			dev.conn = gateway.conn
+			dev.GatewayConnection = gateway.GatewayConnection
 			m.Plugs[dev.Sid] = NewPlug(dev)
 		}
 		saveDev = m.Plugs[dev.Sid].Device
@@ -142,7 +140,7 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 
 	LOGGER.Debug("save to report chan...")
 	if saveDev != nil {
-		saveDev.report(true)
+
 	}
 	LOGGER.Debug("save to report chan over!")
 
@@ -158,14 +156,15 @@ func (m *AqaraManager) whois(conn *GateWayConn) {
 	dev := NewGateWay(iamResp.Device)
 	dev.IP = iamResp.IP
 	dev.Port = iamResp.Port
-	dev.conn = conn
+	dev.Gateway = dev
+	dev.GatewayConnection = conn
 
 	m.GateWay = dev
 }
 
 func (m *AqaraManager) discovery() (err error) {
 	gateway := m.GateWay
-	conn := gateway.conn
+	conn := gateway.GatewayConnection
 
 	//get devlist response
 	LOGGER.Info("start to discover the device...")
@@ -174,7 +173,7 @@ func (m *AqaraManager) discovery() (err error) {
 		return errors.New("show device list error")
 	}
 	//gateway.setToken(devListResp.Token)
-	gateway.conn.token = devListResp.Token
+	gateway.GatewayConnection.token = devListResp.Token
 
 	//every device
 	for index, sid := range devListResp.getSidArray() {
@@ -192,5 +191,5 @@ func (m *AqaraManager) discovery() (err error) {
 }
 
 func (m *AqaraManager) SetAESKey(key string) {
-	m.GateWay.conn.SetAESKey(key)
+	m.GateWay.GatewayConnection.SetAESKey(key)
 }

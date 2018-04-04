@@ -26,40 +26,56 @@ const (
 //GateWay Status
 type Switch struct {
 	*Device
+	State SwitchState
+}
+
+type SwitchState struct {
 	Battery int
 	Click   ClickType
 }
 
+type SwitchStateChange struct {
+	From SwitchState
+	To   SwitchState
+}
+
+func (s SwitchStateChange) IsChanged() bool {
+	return s.From.Battery != s.To.Battery || s.From.Click != s.To.Click
+}
+
 func NewSwitch(dev *Device) *Switch {
-	dev.ReportChan = make(chan interface{}, 1)
 	return &Switch{
-		Device:  dev,
-		Battery: dev.GetDataAsInt(FIELD_BATTERY),
+		Device: dev,
+		State:  SwitchState{Battery: dev.GetDataAsInt(FIELD_BATTERY), Click: NoClick},
 	}
 }
 
 func (s *Switch) Set(dev *Device) {
 	if dev.hasField(FIELD_BATTERY) {
-		s.Battery = dev.GetDataAsInt(FIELD_BATTERY)
+		s.State.Battery = dev.GetDataAsInt(FIELD_BATTERY)
 	}
 
+	change := SwitchStateChange{From: s.State, To: s.State}
 	if dev.hasField(FIELD_STATUS) {
 		status := dev.GetData(FIELD_STATUS)
-		s.report(status)
 
 		if status == "click" {
-			s.Click = SingleClick
+			s.State.Click = SingleClick
 		} else if status == "double_click" {
-			s.Click = DoubleClick
+			s.State.Click = DoubleClick
 		} else if status == "long_click_press" {
-			s.Click = LongPressClick
+			s.State.Click = LongPressClick
 		} else if status == "long_click_release" {
-			s.Click = LongReleaseClick
+			s.State.Click = LongReleaseClick
 		} else {
-			s.Click = NoClick
+			s.State.Click = NoClick
 		}
-
 		//LOGGER.Warn("%s", status)
+	}
+
+	change.To = s.State
+	if change.IsChanged() {
+		s.Gateway.StateChanges <- change
 	}
 
 	if dev.Token != "" {

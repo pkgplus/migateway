@@ -16,14 +16,14 @@ const (
 )
 
 type Device struct {
-	conn    *GateWayConn
-	Sid     string `json:"sid,omitempty"`
-	Model   string `json:"model,omitempty"`
-	ShortID int    `json:"short_id,omitempty"`
-	Data    string `json:"data,omitempty"`
-	Token   string `json:"token,omitempty"`
+	Gateway           *GateWay
+	GatewayConnection *GateWayConn
+	Sid               string `json:"sid,omitempty"`
+	Model             string `json:"model,omitempty"`
+	ShortID           int    `json:"short_id,omitempty"`
+	Data              string `json:"data,omitempty"`
+	Token             string `json:"token,omitempty"`
 
-	ReportChan    chan interface{} `json:"-"`
 	heartBeatTime int64
 	dataMap       map[string]interface{}
 }
@@ -40,22 +40,11 @@ func (d *Device) GetHeartTime() int64 {
 	return d.heartBeatTime
 }
 
-func (d *Device) report(msg interface{}) {
-	select {
-	case d.ReportChan <- msg:
-	default:
-	}
-}
-
-// func (d *Device) setToken(t string) {
-// 	d.Token = t
-// }
-
 func (d *Device) waitToken() bool {
 	begin := time.Now().Unix()
 	for {
 		ct := time.Now().Unix()
-		if d.conn.token != "" &&
+		if d.GatewayConnection.token != "" &&
 			d.heartBeatTime-ct <= 7200 {
 			return true
 		} else if ct-begin >= 30 {

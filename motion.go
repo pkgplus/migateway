@@ -10,10 +10,21 @@ const (
 
 type Motion struct {
 	*Device
-	IsMotorial     bool
-	lastMotionTime int64
-	NoMotionTime   int
-	changeTime     int64
+	State MotionState
+}
+
+type MotionState struct {
+	HasMotion  bool
+	LastMotion time.Time
+}
+
+type MotionStateChange struct {
+	From MotionState
+	To   MotionState
+}
+
+func (m MotionStateChange) IsChanged() bool {
+	return m.From.HasMotion != m.To.HasMotion || m.From.LastMotion != m.To.LastMotion
 }
 
 func (m *Motion) GetData() interface{} {
@@ -21,32 +32,29 @@ func (m *Motion) GetData() interface{} {
 }
 
 func NewMotion(dev *Device) *Motion {
-	dev.ReportChan = make(chan interface{}, 1)
 	m := &Motion{Device: dev}
 	m.Set(dev)
 	return m
 }
 
 func (m *Motion) Set(dev *Device) {
-	last := m.IsMotorial
-	ct := time.Now().Unix()
-
+	timestamp := time.Now()
+	change := MotionStateChange{From: m.State, To: m.State}
 	if dev.hasField(FIELD_STATUS) {
-		m.IsMotorial = dev.GetDataAsBool(FIELD_STATUS)
-
-		if m.IsMotorial {
-			m.lastMotionTime = ct
+		m.State.HasMotion = dev.GetDataAsBool(FIELD_STATUS)
+		if m.State.HasMotion {
+			m.State.LastMotion = timestamp
 		}
-
 	} else if dev.hasField("no_motion") {
-		m.IsMotorial = false
-		m.NoMotionTime = dev.GetDataAsInt("no_motion")
+		m.State.HasMotion = false
+		nomotionInSeconds := int64(dev.GetDataAsInt("no_motion")) * -1
+		timestamp.Add(time.Duration(nomotionInSeconds) * time.Second)
+		m.State.LastMotion = timestamp
 	}
-
-	if last != m.IsMotorial {
-		m.changeTime = ct
+	change.To = m.State
+	if change.IsChanged() {
+		m.Gateway.StateChanges <- change
 	}
-
 	if dev.Token != "" {
 		m.Token = dev.Token
 	}

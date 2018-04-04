@@ -2,9 +2,10 @@ package migateway
 
 import (
 	"errors"
-	mcolor "github.com/bingbaba/tool/color"
 	"image/color"
 	"time"
+
+	mcolor "github.com/bingbaba/tool/color"
 )
 
 const (
@@ -20,15 +21,14 @@ const (
 //GateWay Status
 type GateWay struct {
 	*Device
-	IP       string
-	Port     string
-	lastRGB  uint32
-	RGB      uint32
-	callBack func(gw *GateWay) error
+	IP           string
+	Port         string
+	lastRGB      uint32
+	RGB          uint32
+	StateChanges chan interface{}
 }
 
 func NewGateWay(dev *Device) *GateWay {
-	dev.ReportChan = make(chan interface{}, 1)
 	g := &GateWay{Device: dev}
 	g.Set(dev)
 	return g
@@ -38,6 +38,7 @@ func (g *GateWay) Set(dev *Device) {
 	if dev.hasField(FIELD_IP) {
 		g.IP = dev.GetData(FIELD_IP)
 	}
+
 	if dev.hasField(FIELD_GATEWAY_RGB) {
 		if g.RGB != 0 {
 			LOGGER.Warn("Save Last RGB:%d", g.RGB)
@@ -45,27 +46,19 @@ func (g *GateWay) Set(dev *Device) {
 		}
 		g.RGB = dev.GetDataAsUint32(FIELD_GATEWAY_RGB)
 	}
+
 	if dev.Token != "" {
 		g.setToken(dev.Token)
 	}
+
 	if dev.ShortID > 0 {
 		g.ShortID = dev.ShortID
-	}
-	if g.callBack != nil {
-		err := g.callBack(g)
-		if err != nil {
-			LOGGER.Error("exec callback error:%v", err)
-		}
 	}
 }
 
 func (g *GateWay) setToken(token string) {
 	g.Token = token
-	g.conn.token = token
-}
-
-func (gwd *GateWay) RegisterCb(cb func(gw *GateWay) error) {
-	gwd.callBack = cb
+	g.GatewayConnection.token = token
 }
 
 func (gwd *GateWay) ChangeColor(c color.Color) error {
@@ -73,7 +66,7 @@ func (gwd *GateWay) ChangeColor(c color.Color) error {
 	LOGGER.Info("r:%d,g:%d,b:%d,a:%d", r<<24>>24, g<<24>>24, b<<24>>24, a<<24>>24)
 
 	data := map[string]interface{}{FIELD_GATEWAY_RGB: RGBNumber(c)}
-	return gwd.conn.Control(gwd.Device, data)
+	return gwd.GatewayConnection.Control(gwd.Device, data)
 }
 
 func (gwd *GateWay) ChangeBrightness(b int) error {
@@ -133,13 +126,13 @@ func (gwd *GateWay) flashingOnce(c color.Color, interval time.Duration) error {
 	updata := map[string]interface{}{FIELD_GATEWAY_RGB: RGBNumber(c)}
 	downdata := map[string]interface{}{FIELD_GATEWAY_RGB: RGBNumber(mcolor.COLOR_BLACK)}
 
-	err := gwd.conn.Control(gwd.Device, updata)
+	err := gwd.GatewayConnection.Control(gwd.Device, updata)
 	if err != nil {
 		return err
 	}
 
 	time.Sleep(interval)
-	err = gwd.conn.Control(gwd.Device, downdata)
+	err = gwd.GatewayConnection.Control(gwd.Device, downdata)
 	if err != nil {
 		return err
 	}

@@ -9,6 +9,10 @@ const (
 
 type Plug struct {
 	*Device
+	State PlugState
+}
+
+type PlugState struct {
 	InUse         bool
 	IsOn          bool
 	LoadVoltage   uint32
@@ -16,28 +20,41 @@ type Plug struct {
 	PowerConsumed uint32
 }
 
+type PlugStateChange struct {
+	From PlugState
+	To   PlugState
+}
+
+func (p PlugStateChange) IsChanged() bool {
+	return p.From.InUse != p.To.InUse || p.From.IsOn != p.To.IsOn || p.From.LoadPower != p.To.LoadPower || p.From.LoadVoltage != p.To.LoadVoltage || p.From.PowerConsumed != p.To.PowerConsumed
+}
+
 func NewPlug(dev *Device) *Plug {
-	dev.ReportChan = make(chan interface{}, 1)
 	p := &Plug{Device: dev}
 	p.Set(dev)
 	return p
 }
 
 func (p *Plug) Set(dev *Device) {
+	change := PlugStateChange{From: p.State, To: p.State}
 	if dev.hasField(FIELD_INUSE) {
-		p.InUse = dev.GetDataAsBool(FIELD_INUSE)
+		p.State.InUse = dev.GetDataAsBool(FIELD_INUSE)
 	}
 	if dev.hasField(FIELD_STATUS) {
-		p.IsOn = dev.GetDataAsBool(FIELD_STATUS)
+		p.State.IsOn = dev.GetDataAsBool(FIELD_STATUS)
 	}
 	if dev.hasField(FIELD_PLUG_LOADVOLTAGE) {
-		p.LoadVoltage = dev.GetDataAsUint32(FIELD_PLUG_LOADVOLTAGE)
+		p.State.LoadVoltage = dev.GetDataAsUint32(FIELD_PLUG_LOADVOLTAGE)
 	}
 	if dev.hasField(FIELD_PLUG_LOADPOWER) {
-		p.LoadPower = dev.GetDataAsUint32(FIELD_PLUG_LOADPOWER)
+		p.State.LoadPower = dev.GetDataAsUint32(FIELD_PLUG_LOADPOWER)
 	}
 	if dev.hasField(FIELD_PLUG_POWERCONSUMED) {
-		p.PowerConsumed = dev.GetDataAsUint32(FIELD_PLUG_POWERCONSUMED)
+		p.State.PowerConsumed = dev.GetDataAsUint32(FIELD_PLUG_POWERCONSUMED)
+	}
+	change.To = p.State
+	if change.IsChanged() {
+		p.Gateway.StateChanges <- change
 	}
 	if dev.Token != "" {
 		p.Token = dev.Token
@@ -48,12 +65,12 @@ func (p *Plug) TurnOn() error {
 	data := map[string]interface{}{
 		FIELD_STATUS: "on",
 	}
-	return p.conn.Control(p.Device, data)
+	return p.GatewayConnection.Control(p.Device, data)
 }
 
 func (p *Plug) TurnOff() error {
 	data := map[string]interface{}{
 		FIELD_STATUS: "off",
 	}
-	return p.conn.Control(p.Device, data)
+	return p.GatewayConnection.Control(p.Device, data)
 }

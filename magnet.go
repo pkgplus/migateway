@@ -6,30 +6,49 @@ const (
 
 type Magnet struct {
 	*Device
+	State MagnetState
+}
+
+type MagnetState struct {
 	Opened  bool
 	Battery uint32
 }
 
+type MagnetStateChange struct {
+	From MagnetState
+	To   MagnetState
+}
+
+func (m MagnetStateChange) IsChanged() bool {
+	return m.From.Opened != m.To.Opened && m.From.Battery != m.To.Battery
+}
+
 func NewMagnet(dev *Device) *Magnet {
-	dev.ReportChan = make(chan interface{}, 1)
 	return &Magnet{
 		Device: dev,
-		Opened: dev.GetDataAsBool(FIELD_STATUS),
+		State:  MagnetState{Opened: dev.GetDataAsBool(FIELD_STATUS), Battery: 100},
 	}
 }
 
 func (m *Magnet) Set(dev *Device) {
+
+	change := MagnetStateChange{From: m.State, To: m.State}
 	if dev.hasField(FIELD_STATUS) {
 		status := dev.GetData(FIELD_STATUS)
 		if status == "open" {
-			m.Opened = true
+			m.State.Opened = true
 		} else {
-			m.Opened = false
+			m.State.Opened = false
 		}
 	}
 
 	if dev.hasField(FIELD_BATTERY) {
-		m.Battery = dev.GetDataAsUint32(FIELD_BATTERY)
+		m.State.Battery = dev.GetDataAsUint32(FIELD_BATTERY)
+	}
+
+	change.To = m.State
+	if change.IsChanged() {
+		m.Gateway.StateChanges <- change
 	}
 
 	if dev.Token != "" {
