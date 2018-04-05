@@ -36,8 +36,7 @@ func convertToBatteryPercentage(battery uint32) float64 {
 }
 
 func (m *Magnet) Set(dev *Device) {
-
-	change := MagnetStateChange{ID: m.Sid, From: m.State, To: m.State}
+	change := &MagnetStateChange{ID: m.Sid, From: m.State, To: m.State}
 	if dev.hasField(FIELD_STATUS) {
 		status := dev.GetData(FIELD_STATUS)
 		if status == "open" {
@@ -53,7 +52,7 @@ func (m *Magnet) Set(dev *Device) {
 
 	change.To = m.State
 	if change.IsChanged() {
-		m.Gateway.StateChanges <- change
+		m.Aqara.StateMessages <- change
 	}
 
 	if dev.Token != "" {

@@ -16,14 +16,13 @@ const (
 )
 
 type Device struct {
-	Gateway           *GateWay
-	GatewayConnection *GateWayConn
-	Sid               string `json:"sid,omitempty"`
-	Model             string `json:"model,omitempty"`
-	ShortID           int    `json:"short_id,omitempty"`
-	Data              string `json:"data,omitempty"`
-	Token             string `json:"token,omitempty"`
-
+	GatewayConnection  *GateWayConn  `json:"-"`
+	Sid                string        `json:"sid,omitempty"`
+	Model              string        `json:"model,omitempty"`
+	ShortID            int           `json:"short_id,omitempty"`
+	Data               string        `json:"data,omitempty"`
+	Token              string        `json:"token,omitempty"`
+	Aqara              *AqaraManager `json:"-"`
 	heartBeatTimestamp int64
 	dataMap            map[string]interface{}
 }

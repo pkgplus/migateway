@@ -22,10 +22,9 @@ const (
 //GateWay Status
 type GateWay struct {
 	*Device
-	IP           string
-	Port         string
-	State        GatewayState
-	StateChanges chan interface{}
+	IP    string
+	Port  string
+	State GatewayState
 }
 
 type GatewayState struct {
@@ -42,10 +41,9 @@ func (g GatewayStateChange) IsChanged() bool {
 	return g.From.Illumination != g.To.Illumination || g.From.RGB != g.To.RGB
 }
 
-func NewGateWay(dev *Device, stateChanges chan interface{}) *GateWay {
+func NewGateWay(dev *Device) *GateWay {
 	g := &GateWay{Device: dev, State: GatewayState{RGB: 0, Illumination: 0.0}}
 	g.Set(dev)
-	g.StateChanges = stateChanges
 	return g
 }
 
@@ -60,7 +58,7 @@ func convertIlluminationToPercentage(illumination int) float64 {
 }
 
 func (g *GateWay) Set(dev *Device) {
-	change := GatewayStateChange{ID: g.Sid, From: g.State, To: g.State}
+	change := &GatewayStateChange{ID: g.Sid, From: g.State, To: g.State}
 	if dev.hasField(FIELD_GATEWAY_IP) {
 		g.IP = dev.GetData(FIELD_GATEWAY_IP)
 	}
@@ -74,7 +72,7 @@ func (g *GateWay) Set(dev *Device) {
 
 	change.To = g.State
 	if change.IsChanged() {
-		g.StateChanges <- change
+		g.Aqara.StateMessages <- change
 	}
 
 	if dev.Token != "" {

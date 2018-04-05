@@ -67,12 +67,13 @@ func NewSwitch(dev *Device) *Switch {
 }
 
 func (s *Switch) Set(dev *Device) {
+	change := &SwitchStateChange{ID: s.Sid, From: s.State, To: s.State}
+
 	if dev.hasField(FIELD_BATTERY) {
 		battery := convertToBatteryPercentage(dev.GetDataAsUint32(FIELD_BATTERY))
 		s.State.Battery = battery
 	}
 
-	change := SwitchStateChange{ID: s.Sid, From: s.State, To: s.State}
 	if dev.hasField(FIELD_STATUS) {
 		status := dev.GetData(FIELD_STATUS)
 
@@ -92,7 +93,7 @@ func (s *Switch) Set(dev *Device) {
 
 	change.To = s.State
 	if change.IsChanged() {
-		s.Gateway.StateChanges <- change
+		s.Aqara.StateMessages <- change
 	}
 
 	if dev.Token != "" {

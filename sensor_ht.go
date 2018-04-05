@@ -35,7 +35,7 @@ func NewSensorHt(dev *Device) *SensorHT {
 }
 
 func (s *SensorHT) Set(dev *Device) {
-	change := SensorHTStateChange{ID: s.Sid, From: s.State, To: s.State}
+	change := &SensorHTStateChange{ID: s.Sid, From: s.State, To: s.State}
 	if dev.hasField(FIELD_SENSORHT_TEMPERATURE) {
 		s.State.Temperature = dev.GetDataAsFloat64(FIELD_SENSORHT_TEMPERATURE) / 100
 	}
@@ -44,7 +44,7 @@ func (s *SensorHT) Set(dev *Device) {
 	}
 	change.To = s.State
 	if change.IsChanged() {
-		s.Gateway.StateChanges <- change
+		s.Aqara.StateMessages <- change
 	}
 	if dev.Token != "" {
 		s.Token = dev.Token

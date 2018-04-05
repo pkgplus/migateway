@@ -37,7 +37,7 @@ func NewPlug(dev *Device) *Plug {
 }
 
 func (p *Plug) Set(dev *Device) {
-	change := PlugStateChange{ID: p.Sid, From: p.State, To: p.State}
+	change := &PlugStateChange{ID: p.Sid, From: p.State, To: p.State}
 	if dev.hasField(FIELD_INUSE) {
 		p.State.InUse = dev.GetDataAsBool(FIELD_INUSE)
 	}
@@ -55,7 +55,7 @@ func (p *Plug) Set(dev *Device) {
 	}
 	change.To = p.State
 	if change.IsChanged() {
-		p.Gateway.StateChanges <- change
+		p.Aqara.StateMessages <- change
 	}
 	if dev.Token != "" {
 		p.Token = dev.Token

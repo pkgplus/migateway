@@ -40,7 +40,7 @@ func NewMotion(dev *Device) *Motion {
 
 func (m *Motion) Set(dev *Device) {
 	timestamp := time.Now()
-	change := MotionStateChange{ID: m.Sid, From: m.State, To: m.State}
+	change := &MotionStateChange{ID: m.Sid, From: m.State, To: m.State}
 	if dev.hasField(FIELD_STATUS) {
 		m.State.HasMotion = dev.GetDataAsBool(FIELD_STATUS)
 		if m.State.HasMotion {
@@ -54,7 +54,7 @@ func (m *Motion) Set(dev *Device) {
 	}
 	change.To = m.State
 	if change.IsChanged() {
-		m.Gateway.StateChanges <- change
+		m.Aqara.StateMessages <- change
 	}
 	if dev.Token != "" {
 		m.Token = dev.Token
