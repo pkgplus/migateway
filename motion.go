@@ -14,6 +14,7 @@ type Motion struct {
 }
 
 type MotionState struct {
+	Battery    float32
 	HasMotion  bool
 	LastMotion time.Time
 }
@@ -51,6 +52,10 @@ func (m *Motion) Set(dev *Device) {
 		nomotionInSeconds := int64(dev.GetDataAsInt("no_motion")) * -1
 		timestamp.Add(time.Duration(nomotionInSeconds) * time.Second)
 		m.State.LastMotion = timestamp
+	}
+	if dev.hasField("voltage") {
+		voltage := dev.GetDataAsUint32("voltage")
+		m.State.Battery = float32(voltage) / 33.0
 	}
 	change.To = m.State
 	if change.IsChanged() {

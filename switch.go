@@ -44,7 +44,7 @@ type Switch struct {
 }
 
 type SwitchState struct {
-	Battery float64
+	Battery float32
 	Click   ClickType
 }
 

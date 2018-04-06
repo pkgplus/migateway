@@ -119,6 +119,15 @@ func (d *Device) GetDataAsUint32(field string) uint32 {
 	return uint32(n)
 }
 
+func (d *Device) GetDataAsFloat32(field string) float32 {
+	v := d.GetData(field)
+	n, err := strconv.ParseFloat(v, 32)
+	if err != nil {
+		LOGGER.Warn("parse \"%s\" to float32 failed: %v", v, err)
+	}
+	return float32(n)
+}
+
 func (d *Device) GetDataAsFloat64(field string) float64 {
 	v := d.GetData(field)
 	n, err := strconv.ParseFloat(v, 64)

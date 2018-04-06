@@ -13,11 +13,11 @@ type Plug struct {
 }
 
 type PlugState struct {
+	LoadVoltage   uint32
+	PowerConsumed uint32
+	LoadPower     float32
 	InUse         bool
 	IsOn          bool
-	LoadVoltage   uint32
-	LoadPower     uint32
-	PowerConsumed uint32
 }
 
 type PlugStateChange struct {
@@ -48,7 +48,7 @@ func (p *Plug) Set(dev *Device) {
 		p.State.LoadVoltage = dev.GetDataAsUint32(FIELD_PLUG_LOADVOLTAGE)
 	}
 	if dev.hasField(FIELD_PLUG_LOADPOWER) {
-		p.State.LoadPower = dev.GetDataAsUint32(FIELD_PLUG_LOADPOWER)
+		p.State.LoadPower = dev.GetDataAsFloat32(FIELD_PLUG_LOADPOWER)
 	}
 	if dev.hasField(FIELD_PLUG_POWERCONSUMED) {
 		p.State.PowerConsumed = dev.GetDataAsUint32(FIELD_PLUG_POWERCONSUMED)

@@ -11,7 +11,7 @@ type Magnet struct {
 
 type MagnetState struct {
 	Opened  bool
-	Battery float64
+	Battery float32
 }
 
 type MagnetStateChange struct {
@@ -31,8 +31,8 @@ func NewMagnet(dev *Device) *Magnet {
 	}
 }
 
-func convertToBatteryPercentage(battery uint32) float64 {
-	return float64(battery)
+func convertToBatteryPercentage(battery uint32) float32 {
+	return float32(battery) / 33.0
 }
 
 func (m *Magnet) Set(dev *Device) {
