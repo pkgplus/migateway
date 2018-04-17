@@ -27,18 +27,7 @@ type AqaraManager struct {
 	FreshDevListTime int64
 }
 
-func NewAqaraManager(c *Configure) (m *AqaraManager, err error) {
-	if c == nil {
-		c = DefaultConf
-	}
-	conn := NewConn(c)
-
-	//connection
-	err = conn.initMultiCast()
-	if err != nil {
-		return
-	}
-
+func NewAqaraManager() (m *AqaraManager) {
 	//AqaraManager
 	m = &AqaraManager{
 		Motions:           make(map[string]*Motion),
@@ -51,10 +40,25 @@ func NewAqaraManager(c *Configure) (m *AqaraManager, err error) {
 		DiscoveryTime:     time.Now().Unix(),
 	}
 
-	//find gateway
+	return
+}
+
+func (m *AqaraManager) Start(c *Configure) (err error) {
+	if c == nil {
+		c = DefaultConf
+	}
+
+	// Connection
+	conn := NewConn(c)
+	err = conn.initMultiCast()
+	if err != nil {
+		return
+	}
+
+	// Find gateway
 	m.whois(conn)
 
-	//show device list
+	// Show device list
 	gw_ip := m.GateWay.IP
 	err = conn.initGateWay(gw_ip)
 	if err != nil {
@@ -63,7 +67,7 @@ func NewAqaraManager(c *Configure) (m *AqaraManager, err error) {
 
 	err = m.discovery()
 
-	//report or heartbeat message
+	// Report or heartbeat message
 	go func() {
 		for {
 			m.putDevice(<-conn.devMsgs)

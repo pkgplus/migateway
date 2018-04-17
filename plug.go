@@ -62,6 +62,17 @@ func (p *Plug) Set(dev *Device) {
 	}
 }
 
+func (p *Plug) Toggle() error {
+	tostate := "on"
+	if p.State.IsOn == false {
+		tostate = "off"
+	}
+	data := map[string]interface{}{
+		FIELD_STATUS: tostate,
+	}
+	return p.GatewayConnection.Control(p.Device, data)
+}
+
 func (p *Plug) TurnOn() error {
 	data := map[string]interface{}{
 		FIELD_STATUS: "on",
