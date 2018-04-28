@@ -6,30 +6,53 @@ const (
 
 type Magnet struct {
 	*Device
+	State MagnetState
+}
+
+type MagnetState struct {
 	Opened  bool
-	Battery uint32
+	Battery float32
+}
+
+type MagnetStateChange struct {
+	ID   string
+	From MagnetState
+	To   MagnetState
+}
+
+func (m MagnetStateChange) IsChanged() bool {
+	return m.From.Opened != m.To.Opened && m.From.Battery != m.To.Battery
 }
 
 func NewMagnet(dev *Device) *Magnet {
-	dev.ReportChan = make(chan interface{}, 1)
 	return &Magnet{
 		Device: dev,
-		Opened: dev.GetDataAsBool(FIELD_STATUS),
+		State:  MagnetState{Opened: dev.GetDataAsBool(FIELD_STATUS), Battery: 100},
 	}
 }
 
+func convertToBatteryPercentage(battery uint32) float32 {
+	return float32(battery) / 33.0
+}
+
 func (m *Magnet) Set(dev *Device) {
-	if dev.hasFiled(FIELD_STATUS) {
+	change := &MagnetStateChange{ID: m.Sid, From: m.State, To: m.State}
+	if dev.hasField(FIELD_STATUS) {
 		status := dev.GetData(FIELD_STATUS)
 		if status == "open" {
-			m.Opened = true
+			m.State.Opened = true
 		} else {
-			m.Opened = false
+			m.State.Opened = false
 		}
 	}
 
-	if dev.hasFiled(FIELD_BATTERY) {
-		m.Battery = dev.GetDataAsUint32(FIELD_BATTERY)
+	if dev.hasField(FIELD_BATTERY) {
+		m.State.Battery = convertToBatteryPercentage(dev.GetDataAsUint32(FIELD_BATTERY))
+	}
+
+	change.To = m.State
+	if change.IsChanged() {
+		m.Aqara.StateMessages <- change
 	}
 
 	if dev.Token != "" {

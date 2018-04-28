@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
-	"sync"
 	"time"
 )
 
@@ -15,9 +14,9 @@ const (
 )
 
 type GateWayConn struct {
-	conn      *net.UDPConn
-	connMutex sync.RWMutex
-
+	conn       *net.UDPConn
+	closeRead  chan bool
+	closeWrite chan bool
 	SendMsgs   chan []byte
 	RecvMsgs   chan []byte
 	SendGWMsgs chan []byte
@@ -30,6 +29,8 @@ type GateWayConn struct {
 
 func NewConn(c *Configure) *GateWayConn {
 	return &GateWayConn{
+		closeRead:  make(chan bool),
+		closeWrite: make(chan bool),
 		SendMsgs:   make(chan []byte),
 		RecvMsgs:   make(chan []byte, 100),
 		SendGWMsgs: make(chan []byte),
@@ -40,9 +41,9 @@ func NewConn(c *Configure) *GateWayConn {
 }
 
 func (gwc *GateWayConn) Control(dev *Device, data map[string]interface{}) error {
-	//wait the device mulitcast heartbeat message
+	// wait for multicast heartbeat message from device
 	if !dev.waitToken() {
-		return errors.New("wait heartbeat TIMEOUT!!!")
+		return errors.New("ERROR: heartbeat timeout")
 	}
 
 	req, err := newWriteRequest(dev, gwc.Configure.AESKey, data)
@@ -56,14 +57,14 @@ func (gwc *GateWayConn) Control(dev *Device, data map[string]interface{}) error 
 func (gwc *GateWayConn) Send(req *Request) bool {
 	if req == nil {
 		return false
-	} else {
-		if req.Cmd == CMD_WHOIS {
-			gwc.multicast(req)
-		} else {
-			gwc.sendGW(req)
-		}
-		return true
 	}
+
+	if req.Cmd == CMD_WHOIS {
+		gwc.multicast(req)
+	} else {
+		gwc.sendGW(req)
+	}
+	return true
 }
 
 func (gwc *GateWayConn) waitDevice(sid string) *Device {
@@ -83,12 +84,12 @@ func (gwc *GateWayConn) waitDevice(sid string) *Device {
 
 func (gwc *GateWayConn) initMultiCast() error {
 	//listen
-	udp_l := &net.UDPAddr{IP: net.ParseIP(MULTICAST_ADDR), Port: SERVER_PORT}
-	con, err := net.ListenMulticastUDP("udp4", nil, udp_l)
+	udpaddr := &net.UDPAddr{IP: net.ParseIP(MULTICAST_ADDR), Port: SERVER_PORT}
+	con, err := net.ListenMulticastUDP("udp4", nil, udpaddr)
 	if err != nil {
 		return err
 	}
-	LOGGER.Info("listennig %d ...", SERVER_PORT)
+	LOGGER.Info("listening %d ...", SERVER_PORT)
 
 	//read
 	go func() {
@@ -111,10 +112,12 @@ func (gwc *GateWayConn) initMultiCast() error {
 				if resp.Cmd == CMD_REPORT {
 					gwc.devMsgs <- resp.Device
 				} else if resp.Cmd == CMD_HEARTBEAT {
-					resp.freshHeartTime()
+					resp.setHeartbeatTimestamp()
 					gwc.devMsgs <- resp.Device
 				} else {
-					gwc.RecvMsgs <- buf[0:size]
+					msg := make([]byte, size)
+					copy(msg, buf[0:size])
+					gwc.RecvMsgs <- msg
 				}
 
 			}
@@ -122,14 +125,14 @@ func (gwc *GateWayConn) initMultiCast() error {
 	}()
 
 	//write
-	MULTI_UDP_ADDR := &net.UDPAddr{
+	udpaddrMulticast := &net.UDPAddr{
 		IP:   net.ParseIP(MULTICAST_ADDR),
 		Port: MULTICAST_PORT,
 	}
 	go func() {
 		for {
 			msg := <-gwc.SendMsgs
-			wsize, err3 := con.WriteToUDP(msg, MULTI_UDP_ADDR)
+			wsize, err3 := con.WriteToUDP(msg, udpaddrMulticast)
 			if err3 != nil {
 				panic(err3)
 			}
@@ -203,22 +206,38 @@ func (gwc *GateWayConn) communicate(req *Request, resp Response) bool {
 }
 
 func (gwc *GateWayConn) initGateWay(ip string) (err error) {
-	err = gwc.resetGWConn(ip)
+
+	//do we first need to close an existing connection ?
+	if gwc.conn != nil {
+		// Signal the read and write go-routine to terminate
+		gwc.closeRead <- true
+		gwc.closeWrite <- true
+		gwc.conn.Close()
+	}
+
+	UDPAddr := &net.UDPAddr{
+		IP:   net.ParseIP(ip),
+		Port: SERVER_PORT,
+	}
+
+	//open new conn
+	gwc.conn, err = net.DialUDP("udp4", nil, UDPAddr)
 	if err != nil {
 		return
 	}
 
 	//write
 	go func() {
-		defer gwc.conn.Close()
-		for msg := range gwc.SendGWMsgs {
-			LOGGER.Info("GATEWAY:: send msg: %s", msg)
-
-			gwc.connMutex.RLock()
-			defer gwc.connMutex.RUnlock()
-			_, werr := gwc.conn.Write([]byte(msg))
-			if werr != nil {
-				LOGGER.Error("send error %v", werr)
+		for {
+			select {
+			case <-gwc.closeWrite:
+				return
+			case msg := <-gwc.SendGWMsgs:
+				LOGGER.Info("GATEWAY:: send msg: %s", msg)
+				_, werr := gwc.conn.Write([]byte(msg))
+				if werr != nil {
+					LOGGER.Error("send error %v", werr)
+				}
 			}
 		}
 	}()
@@ -227,16 +246,20 @@ func (gwc *GateWayConn) initGateWay(ip string) (err error) {
 	go func() {
 		buf := make([]byte, 2048)
 		for {
-			gwc.connMutex.RLock()
-			defer gwc.connMutex.RUnlock()
-
-			size, _, err2 := gwc.conn.ReadFromUDP(buf)
-			if err2 != nil {
-				//panic(err2)
-				LOGGER.Error("GATEWAY:: recv error: %v", err2)
-			} else if size > 0 {
-				LOGGER.Debug("GATEWAY:: recv msg: %s", string(buf[0:size]))
-				gwc.RecvGWMsgs <- buf[0:size]
+			select {
+			case <-gwc.closeRead:
+				return
+			default:
+				size, _, err2 := gwc.conn.ReadFromUDP(buf)
+				if err2 != nil {
+					//panic(err2)
+					LOGGER.Error("GATEWAY:: recv error: %v", err2)
+				} else if size > 0 {
+					LOGGER.Debug("GATEWAY:: recv msg: %s", string(buf[0:size]))
+					msg := make([]byte, size)
+					copy(msg, buf[0:size])
+					gwc.RecvGWMsgs <- msg
+				}
 			}
 		}
 	}()
@@ -244,33 +267,9 @@ func (gwc *GateWayConn) initGateWay(ip string) (err error) {
 	return
 }
 
-func (gwc *GateWayConn) resetGWConn(ip string) (err error) {
-	gwc.connMutex.Lock()
-	defer gwc.connMutex.Unlock()
-
-	UDP_ADDR := &net.UDPAddr{
-		IP:   net.ParseIP(ip),
-		Port: SERVER_PORT,
-	}
-
-	//close
-	if gwc.conn != nil {
-		gwc.conn.Close()
-	}
-
-	//open new conn
-	gwc.conn, err = net.DialUDP("udp4", nil, UDP_ADDR)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
 func (gwc *GateWayConn) getChan(cmd string) chan []byte {
 	if cmd == CMD_WHOIS {
 		return gwc.RecvMsgs
-	} else {
-		return gwc.RecvGWMsgs
 	}
+	return gwc.RecvGWMsgs
 }

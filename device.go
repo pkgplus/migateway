@@ -16,47 +16,35 @@ const (
 )
 
 type Device struct {
-	conn    *GateWayConn
-	Sid     string `json:"sid,omitempty"`
-	Model   string `json:"model,omitempty"`
-	ShortID int    `json:"short_id,omitempty"`
-	Data    string `json:"data,omitempty"`
-	Token   string `json:"token,omitempty"`
-
-	ReportChan    chan interface{} `json:"-"`
-	heartBeatTime int64
-	dataMap       map[string]interface{}
+	GatewayConnection  *GateWayConn  `json:"-"`
+	Sid                string        `json:"sid,omitempty"`
+	Model              string        `json:"model,omitempty"`
+	ShortID            int           `json:"short_id,omitempty"`
+	Data               string        `json:"data,omitempty"`
+	Token              string        `json:"token,omitempty"`
+	Aqara              *AqaraManager `json:"-"`
+	heartBeatTimestamp int64
+	dataMap            map[string]interface{}
 }
 
 func (d *Device) RefreshStatus() error {
 	return nil
 }
 
-func (d *Device) freshHeartTime() {
-	d.heartBeatTime = time.Now().Unix()
+func (d *Device) setHeartbeatTimestamp() {
+	d.heartBeatTimestamp = time.Now().Unix()
 }
 
-func (d *Device) GetHeartTime() int64 {
-	return d.heartBeatTime
+func (d *Device) GetHeartbeatTimestamp() int64 {
+	return d.heartBeatTimestamp
 }
-
-func (d *Device) report(msg interface{}) {
-	select {
-	case d.ReportChan <- msg:
-	default:
-	}
-}
-
-// func (d *Device) setToken(t string) {
-// 	d.Token = t
-// }
 
 func (d *Device) waitToken() bool {
 	begin := time.Now().Unix()
 	for {
 		ct := time.Now().Unix()
-		if d.conn.token != "" &&
-			d.heartBeatTime-ct <= 7200 {
+		if d.GatewayConnection.token != "" &&
+			d.heartBeatTimestamp-ct <= 7200 {
 			return true
 		} else if ct-begin >= 30 {
 			return false
@@ -67,7 +55,7 @@ func (d *Device) waitToken() bool {
 	return false
 }
 
-func (d *Device) hasFiled(field string) (found bool) {
+func (d *Device) hasField(field string) (found bool) {
 	if d.Data == "" {
 		return false
 	}
@@ -85,11 +73,9 @@ func (d *Device) hasFiled(field string) (found bool) {
 }
 
 func (d *Device) GetData(field string) string {
-	if d.hasFiled(field) {
+	if d.hasField(field) {
 		v, found := d.dataMap[field]
-		if !found {
-			return ""
-		} else {
+		if found {
 			switch reflect.TypeOf(v).Kind() {
 			case reflect.Int:
 				return fmt.Sprintf("%d", v.(int))
@@ -102,22 +88,16 @@ func (d *Device) GetData(field string) string {
 				return ""
 			}
 		}
-	} else {
-		return ""
 	}
+	return ""
 }
 
 func (d *Device) GetDataAsBool(field string) bool {
 	v := d.GetData(field)
-	if v == "1" ||
-		v == "open" ||
-		v == "on" ||
-		v == "true" ||
-		v == "motion" {
+	if v == "1" || v == "open" || v == "on" || v == "true" || v == "motion" {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 func (d *Device) GetDataAsInt(field string) int {
@@ -137,6 +117,15 @@ func (d *Device) GetDataAsUint32(field string) uint32 {
 		LOGGER.Warn("parse \"%s\" to uint32 failed: %v", v, err)
 	}
 	return uint32(n)
+}
+
+func (d *Device) GetDataAsFloat32(field string) float32 {
+	v := d.GetData(field)
+	n, err := strconv.ParseFloat(v, 32)
+	if err != nil {
+		LOGGER.Warn("parse \"%s\" to float32 failed: %v", v, err)
+	}
+	return float32(n)
 }
 
 func (d *Device) GetDataAsFloat64(field string) float64 {

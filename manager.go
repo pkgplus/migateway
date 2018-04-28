@@ -2,8 +2,9 @@ package migateway
 
 import (
 	"errors"
-	"github.com/bingbaba/util/logs"
 	"time"
+
+	"github.com/bingbaba/util/logs"
 )
 
 var (
@@ -12,45 +13,52 @@ var (
 )
 
 type AqaraManager struct {
-	reportChan chan *Device
+	GateWay           *GateWay
+	Motions           map[string]*Motion
+	Switchs           map[string]*Switch
+	DualWiredSwitches map[string]*DualWiredWallSwitch
+	SensorHTs         map[string]*SensorHT
+	Magnets           map[string]*Magnet
+	Plugs             map[string]*Plug
 
-	GateWay   *GateWay
-	Motions   map[string]*Motion
-	Switchs   map[string]*Switch
-	SensorHTs map[string]*SensorHT
-	Magnets   map[string]*Magnet
-	Plugs     map[string]*Plug
+	StateMessages chan interface{}
 
 	DiscoveryTime    int64
 	FreshDevListTime int64
 }
 
-func NewAqaraManager(c *Configure) (m *AqaraManager, err error) {
+func NewAqaraManager() (m *AqaraManager) {
+	//AqaraManager
+	m = &AqaraManager{
+		Motions:           make(map[string]*Motion),
+		Switchs:           make(map[string]*Switch),
+		DualWiredSwitches: make(map[string]*DualWiredWallSwitch),
+		SensorHTs:         make(map[string]*SensorHT),
+		Magnets:           make(map[string]*Magnet),
+		Plugs:             make(map[string]*Plug),
+		StateMessages:     make(chan interface{}, 1024),
+		DiscoveryTime:     time.Now().Unix(),
+	}
+
+	return
+}
+
+func (m *AqaraManager) Start(c *Configure) (err error) {
 	if c == nil {
 		c = DefaultConf
 	}
-	conn := NewConn(c)
 
-	//connection
+	// Connection
+	conn := NewConn(c)
 	err = conn.initMultiCast()
 	if err != nil {
 		return
 	}
 
-	//AqaraManager
-	m = &AqaraManager{
-		Motions:       make(map[string]*Motion),
-		Switchs:       make(map[string]*Switch),
-		SensorHTs:     make(map[string]*SensorHT),
-		Magnets:       make(map[string]*Magnet),
-		Plugs:         make(map[string]*Plug),
-		DiscoveryTime: time.Now().Unix(),
-	}
-
-	//find gateway
+	// Find gateway
 	m.whois(conn)
 
-	//show device list
+	// Show device list
 	gw_ip := m.GateWay.IP
 	err = conn.initGateWay(gw_ip)
 	if err != nil {
@@ -59,7 +67,7 @@ func NewAqaraManager(c *Configure) (m *AqaraManager, err error) {
 
 	err = m.discovery()
 
-	//report or heartbeat message
+	// Report or heartbeat message
 	go func() {
 		for {
 			m.putDevice(<-conn.devMsgs)
@@ -84,7 +92,8 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 		if found {
 			d.Set(dev)
 		} else {
-			dev.conn = gateway.conn
+			dev.Aqara = m
+			dev.GatewayConnection = gateway.GatewayConnection
 			m.Motions[dev.Sid] = NewMotion(dev)
 		}
 		saveDev = m.Motions[dev.Sid].Device
@@ -93,16 +102,28 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 		if found {
 			d.Set(dev)
 		} else {
-			dev.conn = gateway.conn
+			dev.Aqara = m
+			dev.GatewayConnection = gateway.GatewayConnection
 			m.Switchs[dev.Sid] = NewSwitch(dev)
 		}
 		saveDev = m.Switchs[dev.Sid].Device
+	case MODEL_DUALWIREDSWITCH:
+		d, found := m.DualWiredSwitches[dev.Sid]
+		if found {
+			d.Set(dev)
+		} else {
+			dev.Aqara = m
+			dev.GatewayConnection = gateway.GatewayConnection
+			m.DualWiredSwitches[dev.Sid] = NewDualWiredSwitch(dev)
+		}
+		saveDev = m.DualWiredSwitches[dev.Sid].Device
 	case MODEL_SENSORHT:
 		d, found := m.SensorHTs[dev.Sid]
 		if found {
 			d.Set(dev)
 		} else {
-			dev.conn = gateway.conn
+			dev.Aqara = m
+			dev.GatewayConnection = gateway.GatewayConnection
 			m.SensorHTs[dev.Sid] = NewSensorHt(dev)
 		}
 		saveDev = m.SensorHTs[dev.Sid].Device
@@ -111,7 +132,8 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 		if found {
 			d.Set(dev)
 		} else {
-			dev.conn = gateway.conn
+			dev.Aqara = m
+			dev.GatewayConnection = gateway.GatewayConnection
 			m.Magnets[dev.Sid] = NewMagnet(dev)
 		}
 		saveDev = m.Magnets[dev.Sid].Device
@@ -120,7 +142,8 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 		if found {
 			d.Set(dev)
 		} else {
-			dev.conn = gateway.conn
+			dev.Aqara = m
+			dev.GatewayConnection = gateway.GatewayConnection
 			m.Plugs[dev.Sid] = NewPlug(dev)
 		}
 		saveDev = m.Plugs[dev.Sid].Device
@@ -131,7 +154,7 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 
 	LOGGER.Debug("save to report chan...")
 	if saveDev != nil {
-		saveDev.report(true)
+
 	}
 	LOGGER.Debug("save to report chan over!")
 
@@ -147,14 +170,15 @@ func (m *AqaraManager) whois(conn *GateWayConn) {
 	dev := NewGateWay(iamResp.Device)
 	dev.IP = iamResp.IP
 	dev.Port = iamResp.Port
-	dev.conn = conn
+	dev.Aqara = m
+	dev.GatewayConnection = conn
 
 	m.GateWay = dev
 }
 
 func (m *AqaraManager) discovery() (err error) {
 	gateway := m.GateWay
-	conn := gateway.conn
+	conn := gateway.GatewayConnection
 
 	//get devlist response
 	LOGGER.Info("start to discover the device...")
@@ -163,11 +187,14 @@ func (m *AqaraManager) discovery() (err error) {
 		return errors.New("show device list error")
 	}
 	//gateway.setToken(devListResp.Token)
-	gateway.conn.token = devListResp.Token
+	gateway.GatewayConnection.token = devListResp.Token
 
 	//every device
 	for index, sid := range devListResp.getSidArray() {
+		LOGGER.Info("DISCOVERY[%d] of device %s", index, sid)
 		dev := conn.waitDevice(sid)
+		dev.Aqara = m
+		dev.GatewayConnection = conn
 		dev.Token = devListResp.Token
 		if m.putDevice(dev) {
 			LOGGER.Warn("DISCOVERY[%d]: found the device %s(%s): %v", index, dev.Model, dev.Sid, dev.Data)
@@ -181,5 +208,5 @@ func (m *AqaraManager) discovery() (err error) {
 }
 
 func (m *AqaraManager) SetAESKey(key string) {
-	m.GateWay.conn.SetAESKey(key)
+	m.GateWay.GatewayConnection.SetAESKey(key)
 }

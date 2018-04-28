@@ -2,15 +2,17 @@ package migateway
 
 import (
 	"errors"
-	mcolor "github.com/bingbaba/tool/color"
 	"image/color"
 	"time"
+
+	mcolor "github.com/bingbaba/tool/color"
 )
 
 const (
-	MODEL_GATEWAY     = "gateway"
-	FIELD_GATEWAY_RGB = "rgb"
-	FIELD_IP          = "ip"
+	MODEL_GATEWAY              = "gateway"
+	FIELD_GATEWAY_RGB          = "rgb"
+	FIELD_GATEWAY_ILLUMINATION = "illumination"
+	FIELD_GATEWAY_IP           = "ip"
 
 	FLASHING_WEIGHT_WEAK   = "1"
 	FLASHING_WEIGHT_NORMAL = "2"
@@ -20,80 +22,91 @@ const (
 //GateWay Status
 type GateWay struct {
 	*Device
-	IP       string
-	Port     string
-	lastRGB  uint32
-	RGB      uint32
-	callBack func(gw *GateWay) error
+	IP    string
+	Port  string
+	State GatewayState
+}
+
+type GatewayState struct {
+	RGB          uint32
+	Illumination float64 // Unit: percentage (0-100%)
+}
+type GatewayStateChange struct {
+	ID   string
+	From GatewayState
+	To   GatewayState
+}
+
+func (g GatewayStateChange) IsChanged() bool {
+	return g.From.Illumination != g.To.Illumination || g.From.RGB != g.To.RGB
 }
 
 func NewGateWay(dev *Device) *GateWay {
-	dev.ReportChan = make(chan interface{}, 1)
-	g := &GateWay{Device: dev}
+	g := &GateWay{Device: dev, State: GatewayState{RGB: 0, Illumination: 0.0}}
 	g.Set(dev)
 	return g
 }
 
+func convertIlluminationToPercentage(illumination int) float64 {
+	illumination = (illumination - 300)
+	if illumination < 0 {
+		illumination = 0
+	} else if illumination > 1000 {
+		illumination = 1000
+	}
+	return float64(illumination) / 10.0
+}
+
 func (g *GateWay) Set(dev *Device) {
-	if dev.hasFiled(FIELD_IP) {
-		g.IP = dev.GetData(FIELD_IP)
+	change := &GatewayStateChange{ID: g.Sid, From: g.State, To: g.State}
+	if dev.hasField(FIELD_GATEWAY_IP) {
+		g.IP = dev.GetData(FIELD_GATEWAY_IP)
 	}
-	if dev.hasFiled(FIELD_GATEWAY_RGB) {
-		if g.RGB != 0 {
-			LOGGER.Warn("Save Last RGB:%d", g.RGB)
-			g.lastRGB = g.RGB
-		}
-		g.RGB = dev.GetDataAsUint32(FIELD_GATEWAY_RGB)
+	if dev.hasField(FIELD_GATEWAY_RGB) {
+		g.State.RGB = dev.GetDataAsUint32(FIELD_GATEWAY_RGB)
 	}
+	if dev.hasField(FIELD_GATEWAY_ILLUMINATION) {
+		illumination := dev.GetDataAsInt(FIELD_GATEWAY_ILLUMINATION)
+		g.State.Illumination = convertIlluminationToPercentage(illumination)
+	}
+
+	change.To = g.State
+	if change.IsChanged() {
+		g.Aqara.StateMessages <- change
+	}
+
 	if dev.Token != "" {
 		g.setToken(dev.Token)
 	}
+
 	if dev.ShortID > 0 {
 		g.ShortID = dev.ShortID
-	}
-	if g.callBack != nil {
-		err := g.callBack(g)
-		if err != nil {
-			LOGGER.Error("exec callback error:%v", err)
-		}
 	}
 }
 
 func (g *GateWay) setToken(token string) {
 	g.Token = token
-	g.conn.token = token
-}
-
-func (gwd *GateWay) RegisterCb(cb func(gw *GateWay) error) {
-	gwd.callBack = cb
+	g.GatewayConnection.token = token
 }
 
 func (gwd *GateWay) ChangeColor(c color.Color) error {
 	r, g, b, a := c.RGBA()
-	LOGGER.Info("r:%d,g:%d,b:%d,a:%d", r<<24>>24, g<<24>>24, b<<24>>24, a<<24>>24)
-
+	LOGGER.Info("r:%d,g:%d,b:%d,a:%d", r&0xff, g&0xff, b&0xff, a&0xff)
 	data := map[string]interface{}{FIELD_GATEWAY_RGB: RGBNumber(c)}
-	return gwd.conn.Control(gwd.Device, data)
+	return gwd.GatewayConnection.Control(gwd.Device, data)
 }
 
 func (gwd *GateWay) ChangeBrightness(b int) error {
 	if b < 0 || b > 100 {
-		return errors.New("Brightness should be 0~100 !!!")
+		return errors.New("Brightness should be between 0~100")
 	}
-
 	if b == 0 {
 		return gwd.TurnOff()
-	} else {
-		var rgbNum uint32
-		if gwd.RGB<<24>>24 == 0 {
-			rgbNum = gwd.lastRGB
-		} else {
-			rgbNum = gwd.RGB
-		}
-		rgb := NewRGB(rgbNum)
-		rgb.A = uint8(100 - b)
-		return gwd.ChangeColor(rgb)
 	}
+	rgbNum := uint32(gwd.State.RGB & 0xff)
+	rgb := NewRGB(rgbNum)
+	rgb.A = uint8(100 - b)
+	return gwd.ChangeColor(rgb)
 }
 
 func (gwd *GateWay) TurnOff() error {
@@ -101,14 +114,10 @@ func (gwd *GateWay) TurnOff() error {
 }
 
 func (gwd *GateWay) TurnOn() error {
-	if gwd.RGB > 0 {
-		gwd.lastRGB = gwd.RGB
-	} else if gwd.lastRGB == 0 {
-		gwd.lastRGB = RGBNumber(mcolor.COLOR_WHITE)
-		LOGGER.Warn("Use Default RGB:%d", gwd.lastRGB)
+	rgb := NewRGB(gwd.State.RGB)
+	if gwd.State.RGB == 0 {
+		rgb = mcolor.COLOR_WHITE
 	}
-
-	rgb := NewRGB(gwd.lastRGB)
 	r, g, b, a := rgb.RGBA_8bit()
 	LOGGER.Warn("Change Color %d,%d,%d,%d", r, g, b, a)
 	return gwd.ChangeColor(rgb)
@@ -133,13 +142,13 @@ func (gwd *GateWay) flashingOnce(c color.Color, interval time.Duration) error {
 	updata := map[string]interface{}{FIELD_GATEWAY_RGB: RGBNumber(c)}
 	downdata := map[string]interface{}{FIELD_GATEWAY_RGB: RGBNumber(mcolor.COLOR_BLACK)}
 
-	err := gwd.conn.Control(gwd.Device, updata)
+	err := gwd.GatewayConnection.Control(gwd.Device, updata)
 	if err != nil {
 		return err
 	}
 
 	time.Sleep(interval)
-	err = gwd.conn.Control(gwd.Device, downdata)
+	err = gwd.GatewayConnection.Control(gwd.Device, downdata)
 	if err != nil {
 		return err
 	}
