@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	LOGGER      = logs.GetBlogger()
-	EOF    byte = 0
+	LOGGER ILogger = logs.GetBlogger()
+	EOF    byte    = 0
 )
 
 type AqaraManager struct {
@@ -20,6 +20,7 @@ type AqaraManager struct {
 	SensorHTs         map[string]*SensorHT
 	Magnets           map[string]*Magnet
 	Plugs             map[string]*Plug
+	ReportAllMessages bool
 
 	StateMessages chan interface{}
 
@@ -48,6 +49,8 @@ func (m *AqaraManager) Start(c *Configure) (err error) {
 		c = DefaultConf
 	}
 
+	m.ReportAllMessages = c.ReportAllMessages
+
 	// Connection
 	conn := NewConn(c)
 	err = conn.initMultiCast()
@@ -69,15 +72,30 @@ func (m *AqaraManager) Start(c *Configure) (err error) {
 
 	// Report or heartbeat message
 	go func() {
-		for {
-			m.putDevice(<-conn.devMsgs)
+		for msg := range conn.devMsgs {
+			m.putDevice(msg)
 		}
 	}()
 
 	return
 }
 
+func (m *AqaraManager) Stop() {
+	if nil != m.GateWay.GatewayConnection {
+		m.GateWay.GatewayConnection.stop()
+		m.GateWay.GatewayConnection.closeRead <- true
+		m.GateWay.GatewayConnection.closeWrite <- true
+	}
+
+	close(m.GateWay.GatewayConnection.devMsgs)
+	close(m.StateMessages)
+}
+
 func (m *AqaraManager) putDevice(dev *Device) (added bool) {
+	if nil == dev {
+		return false
+	}
+
 	LOGGER.Info("DEVICESYNC:: %s(%s): %s", dev.Model, dev.Sid, dev.Data)
 	gateway := m.GateWay
 

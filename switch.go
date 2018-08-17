@@ -92,7 +92,7 @@ func (s *Switch) Set(dev *Device) {
 	}
 
 	change.To = s.State
-	if change.IsChanged() {
+	if change.IsChanged() || s.shouldPushUpdates() {
 		s.Aqara.StateMessages <- change
 	}
 

@@ -14,7 +14,9 @@ const (
 )
 
 type GateWayConn struct {
-	conn       *net.UDPConn
+	conn  *net.UDPConn
+	mConn *net.UDPConn
+
 	closeRead  chan bool
 	closeWrite chan bool
 	SendMsgs   chan []byte
@@ -67,6 +69,16 @@ func (gwc *GateWayConn) Send(req *Request) bool {
 	return true
 }
 
+func (gwc *GateWayConn) stop() {
+	if nil != gwc.conn {
+		gwc.conn.Close()
+	}
+
+	if nil != gwc.mConn {
+		gwc.mConn.Close()
+	}
+}
+
 func (gwc *GateWayConn) waitDevice(sid string) *Device {
 	req := NewReadRequest(sid)
 	resp := &DeviceBaseResp{}
@@ -89,6 +101,8 @@ func (gwc *GateWayConn) initMultiCast() error {
 	if err != nil {
 		return err
 	}
+	gwc.mConn = con
+
 	LOGGER.Info("listening %d ...", SERVER_PORT)
 
 	//read
@@ -99,7 +113,8 @@ func (gwc *GateWayConn) initMultiCast() error {
 		for {
 			size, _, err2 := con.ReadFromUDP(buf)
 			if err2 != nil {
-				panic(err2)
+				LOGGER.Error("MULTICAST:: closed connection")
+				return
 			} else if size > 0 {
 				LOGGER.Debug("MULTICAST:: recv msg: %s", string(buf[0:size]))
 
@@ -134,7 +149,8 @@ func (gwc *GateWayConn) initMultiCast() error {
 			msg := <-gwc.SendMsgs
 			wsize, err3 := con.WriteToUDP(msg, udpaddrMulticast)
 			if err3 != nil {
-				panic(err3)
+				LOGGER.Error("MULTICAST:: closed connection")
+				return
 			}
 			LOGGER.Info("MULTICAST:: send msg: %s, %d bytes!", msg, wsize)
 		}

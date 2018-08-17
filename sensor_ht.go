@@ -43,7 +43,7 @@ func (s *SensorHT) Set(dev *Device) {
 		s.State.Humidity = dev.GetDataAsFloat64(FIELD_SENSORHT_HUMIDITY) / 100
 	}
 	change.To = s.State
-	if change.IsChanged() {
+	if change.IsChanged() || s.shouldPushUpdates() {
 		s.Aqara.StateMessages <- change
 	}
 	if dev.Token != "" {

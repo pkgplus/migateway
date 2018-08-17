@@ -39,6 +39,14 @@ func (d *Device) GetHeartbeatTimestamp() int64 {
 	return d.heartBeatTimestamp
 }
 
+func (d *Device) shouldPushUpdates() bool {
+	if nil == d.Aqara {
+		return false
+	}
+
+	return d.Aqara.ReportAllMessages
+}
+
 func (d *Device) waitToken() bool {
 	begin := time.Now().Unix()
 	for {

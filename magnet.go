@@ -51,7 +51,7 @@ func (m *Magnet) Set(dev *Device) {
 	}
 
 	change.To = m.State
-	if change.IsChanged() {
+	if change.IsChanged() || m.shouldPushUpdates() {
 		m.Aqara.StateMessages <- change
 	}
 

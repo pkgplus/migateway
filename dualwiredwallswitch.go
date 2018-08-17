@@ -50,7 +50,7 @@ func (s *DualWiredWallSwitch) Set(dev *Device) {
 		//LOGGER.Warn("%s", status)
 	}
 
-	if change.IsChanged() {
+	if change.IsChanged() || s.shouldPushUpdates() {
 		s.Aqara.StateMessages <- change
 	}
 

@@ -58,7 +58,7 @@ func (m *Motion) Set(dev *Device) {
 		m.State.Battery = float32(voltage) / 33.0
 	}
 	change.To = m.State
-	if change.IsChanged() {
+	if change.IsChanged() || m.shouldPushUpdates() {
 		m.Aqara.StateMessages <- change
 	}
 	if dev.Token != "" {
