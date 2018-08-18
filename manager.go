@@ -12,6 +12,11 @@ var (
 	EOF    byte    = 0
 )
 
+type DeviceDiscoveryMessage struct {
+	ID string
+	State interface{}
+}
+
 type AqaraManager struct {
 	GateWay           *GateWay
 	Motions           map[string]*Motion
@@ -22,7 +27,8 @@ type AqaraManager struct {
 	Plugs             map[string]*Plug
 	ReportAllMessages bool
 
-	StateMessages chan interface{}
+	StateMessages     chan interface{}
+	DiscoveryMessages chan *DeviceDiscoveryMessage
 
 	DiscoveryTime    int64
 	FreshDevListTime int64
@@ -38,6 +44,7 @@ func NewAqaraManager() (m *AqaraManager) {
 		Magnets:           make(map[string]*Magnet),
 		Plugs:             make(map[string]*Plug),
 		StateMessages:     make(chan interface{}, 1024),
+		DiscoveryMessages: make(chan *DeviceDiscoveryMessage, 50),
 		DiscoveryTime:     time.Now().Unix(),
 	}
 
@@ -89,6 +96,7 @@ func (m *AqaraManager) Stop() {
 
 	close(m.GateWay.GatewayConnection.devMsgs)
 	close(m.StateMessages)
+	close(m.DiscoveryMessages)
 }
 
 func (m *AqaraManager) putDevice(dev *Device) (added bool) {
@@ -99,12 +107,12 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 	LOGGER.Info("DEVICESYNC:: %s(%s): %s", dev.Model, dev.Sid, dev.Data)
 	gateway := m.GateWay
 
-	var saveDev *Device
+	var discovery *DeviceDiscoveryMessage
+
 	added = true
 	switch dev.Model {
 	case MODEL_GATEWAY:
 		gateway.Set(dev)
-		saveDev = gateway.Device
 	case MODEL_MOTION:
 		d, found := m.Motions[dev.Sid]
 		if found {
@@ -113,8 +121,11 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 			dev.Aqara = m
 			dev.GatewayConnection = gateway.GatewayConnection
 			m.Motions[dev.Sid] = NewMotion(dev)
+			discovery = &DeviceDiscoveryMessage{
+				ID:dev.Sid,
+				State:m.Motions[dev.Sid].State,
+			}
 		}
-		saveDev = m.Motions[dev.Sid].Device
 	case MODEL_SWITCH:
 		d, found := m.Switchs[dev.Sid]
 		if found {
@@ -123,8 +134,11 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 			dev.Aqara = m
 			dev.GatewayConnection = gateway.GatewayConnection
 			m.Switchs[dev.Sid] = NewSwitch(dev)
+			discovery = &DeviceDiscoveryMessage{
+				ID:dev.Sid,
+				State:m.Switchs[dev.Sid].State,
+			}
 		}
-		saveDev = m.Switchs[dev.Sid].Device
 	case MODEL_DUALWIREDSWITCH:
 		d, found := m.DualWiredSwitches[dev.Sid]
 		if found {
@@ -133,8 +147,11 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 			dev.Aqara = m
 			dev.GatewayConnection = gateway.GatewayConnection
 			m.DualWiredSwitches[dev.Sid] = NewDualWiredSwitch(dev)
+			discovery = &DeviceDiscoveryMessage{
+				ID:dev.Sid,
+				State:m.DualWiredSwitches[dev.Sid].State,
+			}
 		}
-		saveDev = m.DualWiredSwitches[dev.Sid].Device
 	case MODEL_SENSORHT:
 		d, found := m.SensorHTs[dev.Sid]
 		if found {
@@ -143,8 +160,11 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 			dev.Aqara = m
 			dev.GatewayConnection = gateway.GatewayConnection
 			m.SensorHTs[dev.Sid] = NewSensorHt(dev)
+			discovery = &DeviceDiscoveryMessage{
+				ID:dev.Sid,
+				State:m.SensorHTs[dev.Sid].State,
+			}
 		}
-		saveDev = m.SensorHTs[dev.Sid].Device
 	case MODEL_MAGNET:
 		d, found := m.Magnets[dev.Sid]
 		if found {
@@ -153,8 +173,11 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 			dev.Aqara = m
 			dev.GatewayConnection = gateway.GatewayConnection
 			m.Magnets[dev.Sid] = NewMagnet(dev)
+			discovery = &DeviceDiscoveryMessage{
+				ID:dev.Sid,
+				State:m.Magnets[dev.Sid].State,
+			}
 		}
-		saveDev = m.Magnets[dev.Sid].Device
 	case MODEL_PLUG:
 		d, found := m.Plugs[dev.Sid]
 		if found {
@@ -163,18 +186,22 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 			dev.Aqara = m
 			dev.GatewayConnection = gateway.GatewayConnection
 			m.Plugs[dev.Sid] = NewPlug(dev)
+			discovery = &DeviceDiscoveryMessage{
+				ID:dev.Sid,
+				State:m.Plugs[dev.Sid].State,
+			}
 		}
-		saveDev = m.Plugs[dev.Sid].Device
 	default:
 		added = false
 		LOGGER.Warn("DEVICESYNC:: unknown model is %s", dev.Model)
 	}
 
-	LOGGER.Debug("save to report chan...")
-	if saveDev != nil {
+	LOGGER.Debug("save to discovery chan...")
 
+	if nil != discovery {
+		m.DiscoveryMessages <- discovery
 	}
-	LOGGER.Debug("save to report chan over!")
+	LOGGER.Debug("save to discovery chan over!")
 
 	return
 }
