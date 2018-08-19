@@ -196,12 +196,11 @@ func (m *AqaraManager) putDevice(dev *Device) (added bool) {
 		LOGGER.Warn("DEVICESYNC:: unknown model is %s", dev.Model)
 	}
 
-	LOGGER.Debug("save to discovery chan...")
-
 	if nil != discovery {
+		LOGGER.Debug("sending to discovery chan...")
 		m.DiscoveryMessages <- discovery
+		LOGGER.Debug("sending to discovery chan over!")
 	}
-	LOGGER.Debug("save to discovery chan over!")
 
 	return
 }

@@ -11,6 +11,7 @@ import (
 const (
 	FIELD_STATUS  = "status"
 	FIELD_BATTERY = "battery"
+	FIELD_VOLTAGE = "voltage"
 	FIELD_INUSE   = "inuse"
 	FIELD_TOKEN   = "token"
 )
@@ -153,4 +154,16 @@ func (d *Device) GetDataArray() (array []string) {
 	}
 
 	return
+}
+
+func (d *Device) GetBatteryLevel(current float32) float32 {
+	if d.hasField(FIELD_BATTERY) {
+		return convertToBatteryPercentage(d.GetDataAsUint32(FIELD_BATTERY))
+	}
+
+	if d.hasField(FIELD_VOLTAGE) {
+		return convertToBatteryPercentage(d.GetDataAsUint32(FIELD_VOLTAGE))
+	}
+
+	return current
 }

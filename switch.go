@@ -5,6 +5,8 @@ const (
 
 	SWITCH_STATUS_CLICK       = "click"
 	SWITCH_STATUS_DOUBLECLICK = "double_click"
+	SWITCH_STATUS_PRESS       = "long_click_press"
+	SWITCH_STATUS_RELEASE     = "long_click_release"
 )
 
 // ClickType holds the different types of clicks you can perform with a switch
@@ -59,36 +61,32 @@ func (s SwitchStateChange) IsChanged() bool {
 }
 
 func NewSwitch(dev *Device) *Switch {
-	battery := convertToBatteryPercentage(dev.GetDataAsUint32(FIELD_BATTERY))
 	return &Switch{
 		Device: dev,
-		State:  SwitchState{Battery: battery, Click: NoClick},
+		State:  SwitchState{Battery: dev.GetBatteryLevel(0), Click: NoClick},
 	}
 }
 
 func (s *Switch) Set(dev *Device) {
 	change := &SwitchStateChange{ID: s.Sid, From: s.State, To: s.State}
 
-	if dev.hasField(FIELD_BATTERY) {
-		battery := convertToBatteryPercentage(dev.GetDataAsUint32(FIELD_BATTERY))
-		s.State.Battery = battery
-	}
+	s.State.Battery = dev.GetBatteryLevel(s.State.Battery)
 
 	if dev.hasField(FIELD_STATUS) {
 		status := dev.GetData(FIELD_STATUS)
 
-		if status == "click" {
+		switch status {
+		case SWITCH_STATUS_CLICK:
 			s.State.Click = SingleClick
-		} else if status == "double_click" {
+		case SWITCH_STATUS_DOUBLECLICK:
 			s.State.Click = DoubleClick
-		} else if status == "long_click_press" {
+		case SWITCH_STATUS_PRESS:
 			s.State.Click = LongPressClick
-		} else if status == "long_click_release" {
+		case SWITCH_STATUS_RELEASE:
 			s.State.Click = LongReleaseClick
-		} else {
+		default:
 			s.State.Click = NoClick
 		}
-		//LOGGER.Warn("%s", status)
 	}
 
 	change.To = s.State

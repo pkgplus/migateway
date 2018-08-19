@@ -5,7 +5,9 @@ import (
 )
 
 const (
-	MODEL_MOTION = "motion"
+	MODEL_MOTION    = "motion"
+
+	FIELD_NO_MOTION = "no_motion"
 )
 
 type Motion struct {
@@ -34,9 +36,13 @@ func (m *Motion) GetData() interface{} {
 }
 
 func NewMotion(dev *Device) *Motion {
-	m := &Motion{Device: dev}
-	m.Set(dev)
-	return m
+	return &Motion{
+		Device: dev,
+		State: MotionState{
+			Battery:   dev.GetBatteryLevel(0),
+			HasMotion: dev.GetDataAsBool(FIELD_STATUS),
+		},
+	}
 }
 
 func (m *Motion) Set(dev *Device) {
@@ -47,16 +53,14 @@ func (m *Motion) Set(dev *Device) {
 		if m.State.HasMotion {
 			m.State.LastMotion = timestamp
 		}
-	} else if dev.hasField("no_motion") {
+	} else if dev.hasField(FIELD_NO_MOTION) {
 		m.State.HasMotion = false
-		nomotionInSeconds := int64(dev.GetDataAsInt("no_motion")) * -1
+		nomotionInSeconds := int64(dev.GetDataAsInt(FIELD_NO_MOTION)) * -1
 		timestamp.Add(time.Duration(nomotionInSeconds) * time.Second)
 		m.State.LastMotion = timestamp
 	}
-	if dev.hasField("voltage") {
-		voltage := dev.GetDataAsUint32("voltage")
-		m.State.Battery = float32(voltage) / 33.0
-	}
+
+	m.State.Battery = dev.GetBatteryLevel(m.State.Battery)
 	change.To = m.State
 	if change.IsChanged() || m.shouldPushUpdates() {
 		m.Aqara.StateMessages <- change
