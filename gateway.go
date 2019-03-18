@@ -71,7 +71,7 @@ func (g *GateWay) Set(dev *Device) {
 	}
 
 	change.To = g.State
-	if change.IsChanged() {
+	if change.IsChanged() || g.shouldPushUpdates() {
 		g.Aqara.StateMessages <- change
 	}
 

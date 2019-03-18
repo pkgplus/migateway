@@ -54,7 +54,7 @@ func (p *Plug) Set(dev *Device) {
 		p.State.PowerConsumed = dev.GetDataAsUint32(FIELD_PLUG_POWERCONSUMED)
 	}
 	change.To = p.State
-	if change.IsChanged() {
+	if change.IsChanged() || p.shouldPushUpdates() {
 		p.Aqara.StateMessages <- change
 	}
 	if dev.Token != "" {

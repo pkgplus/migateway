@@ -2,6 +2,8 @@ package migateway
 
 const (
 	MODEL_MAGNET = "magnet"
+
+	MAGNET_STATUS_OPEN = "open"
 )
 
 type Magnet struct {
@@ -27,7 +29,10 @@ func (m MagnetStateChange) IsChanged() bool {
 func NewMagnet(dev *Device) *Magnet {
 	return &Magnet{
 		Device: dev,
-		State:  MagnetState{Opened: dev.GetDataAsBool(FIELD_STATUS), Battery: 100},
+		State: MagnetState{
+			Opened:  dev.GetDataAsBool(FIELD_STATUS),
+			Battery: dev.GetBatteryLevel(0),
+		},
 	}
 }
 
@@ -39,19 +44,13 @@ func (m *Magnet) Set(dev *Device) {
 	change := &MagnetStateChange{ID: m.Sid, From: m.State, To: m.State}
 	if dev.hasField(FIELD_STATUS) {
 		status := dev.GetData(FIELD_STATUS)
-		if status == "open" {
-			m.State.Opened = true
-		} else {
-			m.State.Opened = false
-		}
+		m.State.Opened = status == MAGNET_STATUS_OPEN
 	}
 
-	if dev.hasField(FIELD_BATTERY) {
-		m.State.Battery = convertToBatteryPercentage(dev.GetDataAsUint32(FIELD_BATTERY))
-	}
+	m.State.Battery = dev.GetBatteryLevel(m.State.Battery)
 
 	change.To = m.State
-	if change.IsChanged() {
+	if change.IsChanged() || m.shouldPushUpdates() {
 		m.Aqara.StateMessages <- change
 	}
 

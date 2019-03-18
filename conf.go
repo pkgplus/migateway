@@ -13,6 +13,7 @@ var (
 		ReadTimeout:          3,
 		ReadRetry:            1,
 		ReportForwardTimeout: 1,
+		ReportAllMessages:    false,
 		AESKey:               "",
 	}
 )
@@ -25,6 +26,7 @@ type Configure struct {
 	ReadTimeout          int
 	ReadRetry            int
 	ReportForwardTimeout int
+	ReportAllMessages    bool
 
 	AESKey string
 }
@@ -38,6 +40,7 @@ func NewConfig() *Configure {
 		ReadTimeout:          3,
 		ReadRetry:            1,
 		ReportForwardTimeout: 1,
+		ReportAllMessages:    false,
 		AESKey:               "",
 	}
 }
